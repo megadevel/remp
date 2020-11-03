@@ -1,7 +1,6 @@
 #! /usr/bin/make
 
-GOAGEN_DIR="../../vendor/github.com/goadesign/goa/goagen"
-DESIGN_PKG="gitlab.com/remp/remp/Beam/go/cmd/tracker/design"
+DESIGN_PKG="beam/cmd/tracker/design"
 
 TARGET_GOOS?=linux
 TARGET_GOARCH?=amd64
@@ -24,11 +23,11 @@ clean:
 
 gen:
 	set -e
-	cd $(GOAGEN_DIR) && go build
-	$(GOAGEN_DIR)/goagen app -d $(DESIGN_PKG)
-	$(GOAGEN_DIR)/goagen swagger -d $(DESIGN_PKG)
-	rm $(GOAGEN_DIR)/goagen
-	rm -fr goagen*
+	go get github.com/goadesign/goa/...@v1
+	goagen app -d=$(DESIGN_PKG)
+	goagen swagger -d=$(DESIGN_PKG)
+	go get -u github.com/go-bindata/go-bindata/...
+	go-bindata -pkg=data -o=./data/bindata.go -ignore=bindata.go data/
 
 build: gen
 	go build -o tracker

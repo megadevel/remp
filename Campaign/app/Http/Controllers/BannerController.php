@@ -3,10 +3,10 @@
 namespace App\Http\Controllers;
 
 use App\Banner;
-use App\Helpers\Showtime;
 use App\Http\Requests\BannerOneTimeDisplayRequest;
 use App\Http\Requests\BannerRequest;
 use App\Http\Resources\BannerResource;
+use App\Http\Showtime\Showtime;
 use App\Models\Dimension\Map as DimensionMap;
 use App\Models\Position\Map as PositionMap;
 use App\Models\Alignment\Map as AlignmentMap;
@@ -108,7 +108,16 @@ class BannerController extends Controller
 
     public function copy(Banner $sourceBanner)
     {
-        $sourceBanner->load('htmlTemplate', 'mediumRectangleTemplate', 'barTemplate', 'shortMessageTemplate');
+        $sourceBanner->load(
+            'htmlTemplate',
+            'mediumRectangleTemplate',
+            'overlayRectangleTemplate',
+            'htmlOverlayTemplate',
+            'overlayTwoButtonsSignatureTemplate',
+            'barTemplate',
+            'collapsibleBarTemplate',
+            'shortMessageTemplate'
+        );
         $banner = $sourceBanner->replicate();
 
         flash(sprintf('Form has been pre-filled with data from banner "%s"', $sourceBanner->name))->info();

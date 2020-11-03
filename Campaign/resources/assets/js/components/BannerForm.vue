@@ -21,6 +21,7 @@
             ></html-template>
 
             <medium-rectangle-template v-if="template === 'medium_rectangle'"
+               v-bind:_templateId="mediumRectangleTemplate.id"
                v-bind:_headerText="mediumRectangleTemplate.headerText"
                v-bind:_mainText="mediumRectangleTemplate.mainText"
                v-bind:_buttonText="mediumRectangleTemplate.buttonText"
@@ -34,6 +35,7 @@
             ></medium-rectangle-template>
 
             <overlay-rectangle-template v-if="template === 'overlay_rectangle'"
+               v-bind:_templateId="overlayRectangleTemplate.id"
                v-bind:_headerText="overlayRectangleTemplate.headerText"
                v-bind:_mainText="overlayRectangleTemplate.mainText"
                v-bind:_buttonText="overlayRectangleTemplate.buttonText"
@@ -47,18 +49,33 @@
                v-bind:show="show"
             ></overlay-rectangle-template>
 
+            <overlay-two-buttons-signature-template v-if="template === 'overlay_two_buttons_signature'"
+                                                    v-bind:_templateId="overlayTwoButtonsSignatureTemplate.id"
+                                                    v-bind:_textBefore="overlayTwoButtonsSignatureTemplate.textBefore"
+                                                    v-bind:_textAfter="overlayTwoButtonsSignatureTemplate.textAfter"
+                                                    v-bind:_textBtnPrimary="overlayTwoButtonsSignatureTemplate.textBtnPrimary"
+                                                    v-bind:_textBtnPrimaryMinor="overlayTwoButtonsSignatureTemplate.textBtnPrimaryMinor"
+                                                    v-bind:_textBtnSecondary="overlayTwoButtonsSignatureTemplate.textBtnSecondary"
+                                                    v-bind:_textBtnSecondaryMinor="overlayTwoButtonsSignatureTemplate.textBtnSecondaryMinor"
+                                                    v-bind:_targetUrlSecondary="overlayTwoButtonsSignatureTemplate.targetUrlSecondary"
+                                                    v-bind:_signatureImageUrl="overlayTwoButtonsSignatureTemplate.signatureImageUrl"
+                                                    v-bind:_textSignature="overlayTwoButtonsSignatureTemplate.textSignature"
+                                                    v-bind:show="show"
+            ></overlay-two-buttons-signature-template>
+
             <html-overlay-template v-if="template === 'html_overlay'"
-                v-bind:_backgroundColor="htmlOverlayTemplate.backgroundColor"
-                v-bind:_text="htmlOverlayTemplate.text"
-                v-bind:_css="htmlOverlayTemplate.css"
-                v-bind:_textColor="htmlOverlayTemplate.textColor"
-                v-bind:_fontSize="htmlOverlayTemplate.fontSize"
-                v-bind:_textAlign="htmlOverlayTemplate.textAlign"
-                v-bind:alignmentOptions="alignmentOptions"
-                v-bind:show="show"
+                                   v-bind:_backgroundColor="htmlOverlayTemplate.backgroundColor"
+                                   v-bind:_text="htmlOverlayTemplate.text"
+                                   v-bind:_css="htmlOverlayTemplate.css"
+                                   v-bind:_textColor="htmlOverlayTemplate.textColor"
+                                   v-bind:_fontSize="htmlOverlayTemplate.fontSize"
+                                   v-bind:_textAlign="htmlOverlayTemplate.textAlign"
+                                   v-bind:alignmentOptions="alignmentOptions"
+                                   v-bind:show="show"
             ></html-overlay-template>
 
             <bar-template v-if="template === 'bar'"
+               v-bind:_templateId="barTemplate.id"
                v-bind:_mainText="barTemplate.mainText"
                v-bind:_buttonText="barTemplate.buttonText"
                v-bind:_backgroundColor="barTemplate.backgroundColor"
@@ -69,6 +86,7 @@
             ></bar-template>
 
             <collapsible-bar-template v-if="template === 'collapsible_bar'"
+               v-bind:_templateId="collapsibleBarTemplate.id"
                v-bind:_mainText="collapsibleBarTemplate.mainText"
                v-bind:_buttonText="collapsibleBarTemplate.buttonText"
                v-bind:_headerText="collapsibleBarTemplate.headerText"
@@ -140,6 +158,12 @@
                                 <div class="fg-line">
                                     <label for="js" class="fg-label">Custom JS</label>
                                     <textarea v-model="js" class="form-control fg-input" rows="6" name="js" cols="50" id="js"></textarea>
+                                    <small class="help-block">Custom JS is run as a function with single a function parameter <i>params</i>.
+                                        Object <i>params</i> contains several properties of the banner you can access.
+                                        <span data-toggle="tooltip"
+                                              data-original-title="properties: utmMedium, utmCampaign, utmContent, bannerVariant"
+                                              class="glyphicon glyphicon-question-sign"></span>
+                                    </small>
                                 </div>
                             </div><!-- .input-group -->
 
@@ -169,6 +193,20 @@
                                     <input v-for="cssInclude in cssIncludes" type="hidden" name="css_includes[]" :value="cssInclude">
                                 </div>
                                 <input v-else type="hidden" name="css_includes[]">
+                            </div><!-- .input-group -->
+
+                            <div class="input-group fg-float checkbox">
+                                <label class="m-l-15">
+                                    Track banner events manually
+                                    <input v-model="manualEventsTracking" value="1" name="manual_events_tracking" type="checkbox">
+                                    <i class="input-helper"></i>
+                                    <small class="help-block">
+                                        Banner events (show, click, close) are tracked back to Campaign tool automatically.
+                                        Enable if you need to manually control when events are fired.
+                                        To track events manually, use <i>remplib.tracker.trackEvent()</i> function.
+                                        See <a href="https://github.com/remp2020/remp/tree/master/Beam#js-tracking-interface">documentation</a> for further details.
+                                    </small>
+                                </label>
                             </div><!-- .input-group -->
 
                         </div>
@@ -337,6 +375,7 @@
                                         :htmlTemplate="htmlTemplate"
                                         :htmlOverlayTemplate="htmlOverlayTemplate"
                                         :shortMessageTemplate="shortMessageTemplate"
+                                        :overlayTwoButtonsSignatureTemplate="overlayTwoButtonsSignatureTemplate"
 
                                         :position="position"
                                         :offsetVertical="offsetVertical"
@@ -351,6 +390,7 @@
                                         :js="js"
                                         :jsIncludes="jsIncludes"
                                         :cssIncludes="cssIncludes"
+                                        :manualEventsTracking="manualEventsTracking"
                                 ></banner-preview>
                             </div>
                         </div>
@@ -377,6 +417,7 @@
     import vSelect from "remp/js/components/vSelect";
     import FormValidator from "remp/js/components/FormValidator";
     import HtmlOverlayTemplate from "./templates/HtmlOverlay";
+    import OverlayTwoButtonsSignatureTemplate from "./templates/OverlayTwoButtonsSignature";
 
     const props = {
         "_name": String,
@@ -403,6 +444,7 @@
         "_htmlOverlayTemplate": Object,
         "_shortMessageTemplate": Object,
         "_overlayRectangleTemplate": Object,
+        "_overlayTwoButtonsSignatureTemplate": Object,
 
         "_alignmentOptions": Object,
         "_dimensionOptions": Object,
@@ -413,7 +455,8 @@
 
         "_js": String,
         "_jsIncludes": Array,
-        "_cssIncludes": Array
+        "_cssIncludes": Array,
+        "_manualEventsTracking": Boolean,
     };
 
     export default {
@@ -427,7 +470,8 @@
             BannerPreview,
             vSelect,
             FormValidator,
-            OverlayRectangleTemplate
+            OverlayRectangleTemplate,
+            OverlayTwoButtonsSignatureTemplate
         },
         name: 'banner-form',
         props: props,
@@ -465,6 +509,7 @@
             htmlOverlayTemplate: null,
             shortMessageTemplate: null,
             overlayRectangleTemplate: null,
+            overlayTwoButtonsSignatureTemplate: null,
 
             alignmentOptions: [],
             dimensionOptions: [],
@@ -487,12 +532,13 @@
             js: null,
             jsIncludes: null,
             cssIncludes: null,
+            manualEventsTracking: null,
 
             fieldParamsMessage: "UTM params will be automatically appended to every link in this field.<br> If you want to add custom parameter to specific link: add data-param-* attribute. e.g.: data-param-foo=\"baz\""
         }),
         computed: {
             isOverlay: function() {
-                return this.overlayRectangleTemplate == null && this.htmlOverlayTemplate == null;
+                return this.overlayRectangleTemplate == null && this.htmlOverlayTemplate == null && this.overlayTwoButtonsSignatureTemplate == null;
             },
             jsIncludesStr: {
                 get: function () {

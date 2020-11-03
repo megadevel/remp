@@ -45,18 +45,18 @@ You can override any default config from
 Lists represent categories of emails (newsletters). Their primary (and only) use case is to group single emails within 
 a newsletter and manage subscriptions of users to these newsletters.
 
-When you create new newsletter, you can specify:
+When you create a new newsletter, you can specify:
 
 * *Name.* User-friendly name of the newsletter (e.g. "Weekly newsletter", "Breaking news", ...)
 * *Code.* Computer-friendly name of the newsletter (slug; e.g. "weekly_newsletter", "breaking_news", ...)
 * *Auto subscribe flag.* Flag indicating whether new users (reported by external CRM via API) should be automatically
 subscribed to the newsletter or not.
 * *Public flag.* Flag indicating whether the newsletter should be listed in the public listing available for end users.
-Mailer doesn't provide a user-facing frontend, so this flag is targetted primarily for the party implementing the frontend.
+Mailer doesn't provide a user-facing frontend, so this flag is targeted primarily for the party implementing the frontend.
 
 Any handling of subscription/unsubscription of end users from newsletters is handled via API. Publishers mostly want
 to have this included within the customer zone of their systems - designed consistently with the rest of their system.
-Therefore Mailer doesn't provide **any** user-facing frontend. 
+Therefore, Mailer doesn't provide **any** user-facing frontend. 
 
 To see the APIs to integration subscription management, see [Managing user subscription](#managing-user-subscriptions)
 section.
@@ -73,7 +73,7 @@ while doing so. As the names suggest:
     injected.
     
 * *Emails.* They represent actual content of the *email* (e.g. single edition of the weekly newsletter). Every *email* has
-couple of settings you can configure:
+a couple of settings you can configure:
 
     * *Name.* User-friendly name of the email. It's displayed only in the administration parts of the system.
     * *Code.* Computer-friendly name of the email (slug). Primarily being used when referencing single email that's being
@@ -85,9 +85,12 @@ couple of settings you can configure:
     * *From.* Who should be used as a sender of email (e.g. `Support <support@example.com`).
     * *Subject.* Email subject.
     * *Text version.* Text version used as a fallback by email clients.
-    * *HTML version.* HTML (primary) version of email that people will see. HTML version is being previewed in the
+    * *HTML version.* HTML (primary) version of email that people will see. HTML version will show preview in the
     form for creation of new email.
     
+HTML version can be edited by CodeMirror editor (html, default) or Trumbowyg editor (WYSIWYG). 
+Default editor can be changed using `.env` variable `TEMPLATE_EDITOR`. (options: `codemirror`, `wysiwyg`)
+
 Text and HTML versions of *email* support [Twig syntax](https://twig.symfony.com/doc/2.x/templates.html) and you can use
 standard Twig features in your templates. Mailer is able to provide custom variables to your templates. These can
 originate from different sources:
@@ -119,7 +122,7 @@ statistics. This is useful when you want to run an A/B test on smaller *batch*, 
 When creating a *job*, you implicitly create also its first *batch*. The *job* has only one option shared across all batches:
 
 * *Segment.* Defines which [*segment* of users](#segment-integration) (needs integration) should receive the email. This does not relate to
-the *newsletter* subscribers in any way. *Segment* of users should simply state the set of users you're targetting. For
+the *newsletter* subscribers in any way. *Segment* of users should simply state the set of users you're targeting. For
 example *"people registered yesterday"* or *"people without a payment"*. It's configured on a *job* level and it's shared
 across all *batches*.
 
@@ -140,11 +143,11 @@ will receive necessary information about target group of users and prepares meta
 Once the metadata is ready and the *batch* is in the *processed* state, it will be picked up by sending daemon and
 actual emails will be sent via preconfigured Mailer (SMTP, Mailgun, ...).
 
-You can create and execute *jobs*/*batches* programatically by using provided API endpoints. 
+You can create and execute *jobs*/*batches* programmatically by using provided API endpoints. 
 
 ##### Generators
 
-Generators are single-purpose implementations that help to generate HTML/text content of *emails* programatically
+Generators are single-purpose implementations that help to generate HTML/text content of *emails* programmatically
 based on the provided input. That means that instead of manually preparing *email* content (HTML to send) every time
 you want to send an email, you can simplify the creation by implementing custom generator that can do the hard work
 for you.
@@ -160,8 +163,8 @@ variables used within generator template will always be provided (unless the imp
 
 ###### Implementing generator
 
-To create new generator, you need to implement [`Remp\MailerModule\Generators\IGenerator` interface](app/models/Generators/IGenerator.php). Methods are descibed
-below with references to `UrlParserGenerator`:
+To create a new generator, you need to implement [`Remp\MailerModule\Generators\IGenerator` interface](app/models/Generators/IGenerator.php).
+Methods are described below with references to `UrlParserGenerator`:
 
 * `generateForm(Form $form)`. Generators need a way how to get arbitrary input from user. This method should add new
 form elements into the `$form` instance and state the validation rules.
@@ -229,7 +232,7 @@ that helps to shape the final HTML of *email*.
     }
     ```
 
-* `getWidgets()`. Provides array of class names of widgets that might be rendered on the page after generator form
+* `getWidgets()`. Provides an array of class names of widgets that might be rendered on the page after generator form
 submission. As generator "only" generates HTML/text content of email, you might want to attach some extra behavior or
 controls to the success page - such as email preview or button to create and start *job*/*batch*.
 
@@ -249,7 +252,7 @@ controls to the success page - such as email preview or button to create and sta
     }
     ```
     
-* `apiParams()`. Provides array of input parameters that generator requires when used via API. These parameters should
+* `apiParams()`. Provides an array of input parameters that generator requires when used via API. These parameters should
 mirror fields added in `generateForm()` method. They are utilized when calling [Generate mail API]().
 
     ```php
@@ -279,7 +282,7 @@ to the parameters stated in `apiParams()`. This is a very specific use of an int
     * As the generator implementation can be very specific (for example couple of our generators expect text version
     of Wordpress post as one of the inputs), it's OK to tie API part of the generator to the caller.
     * CMS receives back data extracted from WP post in a form, that can be submitted to the Mailer's Generator form and
-    also an URL where these data can be submitted.
+    a URL where these data can be submitted.
     * CMS provides a link, that creates a hidden form, populates it with *preprocessed* data and submits it to the Mailer.
     
     The result is, that instead of someone manually copy-pasting data out of Wordpress to Mailer, one can simply "trigger"
@@ -359,7 +362,7 @@ All examples use `http://mailer.remp.press` as a base domain. Please change the 
 before executing the examples.
 
 All examples use `XXX` as a default value for authorization token, please replace it with the
-real token API token that can be acquired in the REMP SSO.
+real token API token which can be acquired in the REMP SSO.
 
 API responses can contain following HTTP codes:
 
@@ -370,7 +373,7 @@ API responses can contain following HTTP codes:
 | 403 Forbidden | The authorization failed (provided token was not valid) | 
 | 404 Not found | Referenced resource wasn't found | 
 
-If possible, the response includes `application/json` encoded payload with message explaining
+If possible, the response includes `application/json` encoded payload with a message explaining
 the error further.
 
 ---
@@ -520,10 +523,9 @@ Response:
 
 ---
 
-#### POST `/api/v1/users/subscribe`
+#### POST `/api/v1/users/is-unsubscribed`
 
-API call subscribes email address to the given newsletter. Newsletter has to already be created. As there's no API
-for that, please visit `/list/new` to create newsletter via web admin.
+API call that checks if user is unsubscribed from given newsletter list.
 
 ##### *Headers:*
 
@@ -535,12 +537,127 @@ for that, please visit `/list/new` to create newsletter via web admin.
 
 ```json5
 {
-	"email": "admin@example.com", // String; email of the user
-	"user_id": 123, // Integer; ID of the user
+  // required
+  "user_id": 1, // Integer; ID of user
+  "email": "test@test.sk", // String; Email of user,
+  "list_id": 1 // Integer; ID of newsletter
+}
+```
+
+##### *Example:*
+
+```shell
+curl -X POST \
+  http://mailer.remp.press/api/v1/users/is-unsubscribed \
+  -H 'Authorization: Bearer XXX' \
+  -H 'Content-Type: application/json' \
+  -d '{
+	"user_id": 123,
+    "email": "test@test.sk",
+	"list_id": 1
+}'
+```
+
+Response:
+
+```json5
+true
+```
+
+---
+
+#### POST `/api/v1/users/user-preferences`
+
+API call to get subscribed newsletter lists and their variants.
+
+##### *Headers:*
+
+| Name | Value | Required | Description |
+| --- |---| --- | --- |
+| Authorization | Bearer *String* | yes | API token. |
+
+##### *Body:*
+
+```json5
+{
+  //required
+  "user_id": 1, // Integer; ID of user
+  "email": "test@test.com", // String; Email to get preferences for
+
+  // optional
+  "subscribed": true // Boolean; Get only subscribed newsletters
+}
+```
+
+##### *Example:*
+
+```shell
+curl -X POST \
+  http://mailer.remp.press/api/v1/users/user-preferences \
+  -H 'Authorization: Bearer XXX' \
+  -H 'Content-Type: application/json' \
+  -d '{
+	"user_id": 123,
+	"email": "test@test.com"
+}'
+```
+
+Response:
+
+```json5
+[
+  {
+    "id": 1,
+    "code": "demo-weekly-newsletter",
+    "title": "DEMO Weekly newsletter",
+    "is_subscribed": true,
+    "variants": [],
+    "updated_at": "2020-04-06T00:15:32+02:00"
+  },
+  {
+    "id": 2,
+    "code": "123",
+    "title": "Test",
+    "is_subscribed": true,
+    "variants": [
+      {
+        "id": 2,
+        "code": "test-variant",
+        "title": "Test Variant"
+      }
+    ],
+    "updated_at": "2020-04-10T15:27:35+02:00"
+  }
+]
+```
+
+---
+
+#### POST `/api/v1/users/subscribe`
+
+API call subscribes email address to the given newsletter. Newsletter has tp be already created.
+Currently, there's no API endpoint for that and the newsletter needs to be created manually.
+Please visit `/list/new` to create a newsletter via web admin.
+
+##### *Headers:*
+
+| Name | Value | Required | Description |
+| --- |---| --- | --- |
+| Authorization | Bearer *String* | yes | API token. |
+
+##### *Body:*
+
+```json5
+{
+  "email": "admin@example.com", // String; email of the user
+  "user_id": 123, // Integer; ID of the user
 	
-	// one of the following is required
-	"list_id": 14, // Integer; ID of the newsletter list you're subscribing the user to
-	"list_code": "alerts", // String; code of the newsletter list you're subscribing the user to
+  // one of the following is required
+  "list_id": 14, // Integer; ID of the newsletter list you're subscribing the user to
+  "list_code": "alerts", // String; code of the newsletter list you're subscribing the user to
+
+  // optional 
+  "variant_code": "123", // String;  Code of newsletter variant to subscribe
 }
 ```
 
@@ -554,7 +671,8 @@ curl -X POST \
   -d '{
 	"email": "admin@example.com",
 	"user_id": 123,
-	"list_id": 1
+	"list_id": 1,
+	"variant_id": 1
 }'
 ```
 
@@ -572,7 +690,7 @@ Response:
 
 API call unsubscribes email address from the given newsletter.
 
-Endpoint accepts optional array of UTM parameters. Every link in email send by Mailer contain UTM parameters
+Endpoint accepts an optional array of UTM parameters. Every link in email send by Mailer contain UTM parameters
 referencing to the specific instance of sent email. If user unsubscribes via specific email, your frontend will also
 receive special UTM parameters, that can be passed to this API call. For instance link to unsubscribe from our daily
 newsletter might look like this:
@@ -601,6 +719,9 @@ of emails won't be available.
     // one of the following is required
     "list_id": 14, // Integer; ID of the newsletter list you're subscribing the user to
     "list_code": "alerts", // String; code of the newsletter list you're subscribing the user to
+
+    // optional 
+    "variant_id": 1, // Integer;  ID of newsletter variant to unsubscribe
     
     // optional UTM parameters for tracking "what" made the user unsubscribe
     "utm_params": { // Object; optional UTM parameters for pairing which email caused the user to unsubscribe. UTM params are generated into the email links automatically.
@@ -623,6 +744,7 @@ curl -X POST \
 	"email": "admin@example.com",
 	"user_id": 12,
 	"list_id": 1,
+	"variant_id": 1,
 	"utm_params": {
 		"utm_source": "newsletter_daily",
 		"utm_medium": "email",
@@ -644,7 +766,7 @@ Response:
 
 #### POST `/api/v1/users/bulk-subscribe`
 
-Bulk subscribe allows to subscribe and unsubscribe multiple users in one batch. For details about subscribe / unsubscribe see individual calls above.
+Bulk subscribe allows subscribing and unsubscribing multiple users in one batch. For details about subscribe / unsubscribe see individual calls above.
 
 ##### *Headers:*
 
@@ -805,7 +927,7 @@ Token is appended as a query parameter `token`, for example:
 https://predplatne.dennikn.sk/?token=206765522b71289504ae766389bf741x
 ```
 
-Your frontend application can read this token on visit and verify against this API whether it's still valid or not.
+Your frontend application can read this token on a visit and verify against this API whether it's still valid or not.
 If it's valid, you can automatically log user in based on the ID/email the endpoint provides. 
 
 ##### *Body:*
@@ -876,6 +998,168 @@ Response:
 
 ---
 
+#### POST `/api/v1/users/logs-count-per-status`
+
+Returns number of emails matching the status based on given timeframe. Count is returned separately for each selected status.
+
+##### *Headers:*
+
+| Name | Value | Required | Description |
+| --- |---| --- | --- |
+| Authorization | Bearer *String* | yes | API token. |
+
+##### *Body:*
+
+```json5
+{
+  // required 
+  "email": "test@test.com", // String; email
+  "filter": ["sent_at", "delivered_at"], 
+
+  // optional 
+  "from": "2020-04-07T13:33:44+02:00", // String - RFC 3339 format; Restrict results to specific from date, optional
+  "to": "2020-04-10T13:33:44+02:00" // String - RFC 3339 format; Restrict results to specific to date, optional
+}
+```
+
+##### *Example:*
+
+```shell
+curl -X POST \
+  http://mailer.remp.press/api/v1/users/logs-count-per-status \
+  -H 'Authorization: Bearer XXX' \
+  -H 'Content-Type: application/json' \
+  -d '{
+    "email": "test@test.com", // String; email
+    "filter": ["sent_at", "delivered_at"], 
+    "from": "2020-04-07T13:33:44+02:00", // String - RFC 3339 format; Restrict results to specific from date, optional
+    "to": "2020-04-10T13:33:44+02:00" // String - RFC 3339 format; Restrict results to specific to date, optional
+}'
+```
+
+Response:
+
+```json5
+{
+    "sent_at": 2,
+    "delivered_at": 2
+}
+```
+
+---
+
+#### POST `/api/v1/users/logs`
+
+Returns mail logs based on given criteria
+
+##### *Headers:*
+
+| Name | Value | Required | Description |
+| --- |---| --- | --- |
+| Authorization | Bearer *String* | yes | API token. |
+
+##### *Body:*
+
+```json5
+{
+  //required
+  "email": "test@test.com", // String; email
+
+  // optional 
+  "filter": { // Available filters are delivered_at, clicked_at, opened_at, dropped_at, spam_complained_at, hard_bounced_at
+    "hard_bounced_at": {
+      "from": "2020-04-07T13:33:44+02:00", // String - RFC 3339 format; Restrict results to specific from date, optional
+      "to": "2020-04-10T13:33:44+02:00" // String - RFC 3339 format; Restrict results to specific to date, optional
+    }
+  },
+  "mail_template_ids": [1,2,3], // Array of integers; Ids of templates
+  "page": 1, // Integer;
+  "limit": 2 // Integer; Limit of results per page
+}
+```
+
+##### *Filter can also be in a format:*
+
+```json5
+{
+  "filter": ["dropped_at", "delivered_at"] // Available filters are sent_at, delivered_at, clicked_at, opened_at, dropped_at, spam_complained_at, hard_bounced_at
+}
+```
+
+##### *Example:*
+
+```shell
+curl -X POST \
+  http://mailer.remp.press/api/v1/users/logs \
+  -H 'Authorization: Bearer XXX' \
+  -H 'Content-Type: application/json' \
+  -d '{
+    "filter": {
+        "dropped_at": {},
+        "delivered_at": {
+          "to": "2020-04-07T13:33:44+02:00"
+        },
+        "spam_complained_at": {
+          "from": "2020-04-07T13:33:44+02:00"
+        },
+        "hard_bounced_at": {
+          "from": "2020-04-07T13:33:44+02:00",
+          "to": "2020-04-10T13:33:44+02:00"
+        }
+    },
+    "email": "test@test.com",
+    "mail_template_ids": [1,2,3],
+    "page": 1,
+    "limit": 2
+}'
+```
+
+Response:
+
+```json5
+[
+ {
+    "id": 2,
+    "email": "test@test.com",
+    "subject": null,
+    "mail_template": {
+      "id": 1,
+      "code": "demo_email",
+      "name": "Demo email"
+    },
+    "sent_at": "2020-04-08T19:26:00+02:00",
+    "delivered_at": "2020-04-08T13:33:44+02:00",
+    "dropped_at": "2020-04-08T19:28:36+02:00",
+    "spam_complained_at": null,
+    "hard_bounced_at": null,
+    "clicked_at": null,
+    "opened_at": null,
+    "attachment_size": null
+  },
+  {
+    "id": 4,
+    "email": "test@test.com",
+    "subject": null,
+    "mail_template": {
+      "id": 2,
+      "code": "example_email",
+      "name": "Example email"
+    },
+    "sent_at": "2020-04-08T19:26:00+02:00",
+    "delivered_at": null,
+    "dropped_at": "2020-04-08T19:28:46+02:00",
+    "spam_complained_at": null,
+    "hard_bounced_at": null,
+    "clicked_at": null,
+    "opened_at": null,
+    "attachment_size": null
+  }
+]
+```
+
+---
+
+
 #### GET `/api/v1/mailers/mail-types`
 
 Lists all available *newsletter lists* (mail types). *Code* of the newsletter is required when creating
@@ -887,11 +1171,18 @@ new *email* template via API.
 | --- |---| --- | --- |
 | Authorization | Bearer *String* | yes | API token. |
 
+##### *Params:*
+
+| Name | Value | Required | Description |
+| --- |---| --- | --- |
+| code | *String* | no | Filter only newsletter (mail type) with specific code. Returns array with either 0 or 1 element. |
+| public_listing | *Boolean* | no | Flag whether only newsletters (mail types) hat should/shouldn't be available to be listed publicly should be returned. |
+
 ##### *Example:*
 
 ```shell
 curl -X GET \
-  http://mailer.remp.press/api/v1/mailers/mail-types \
+  http://mailer.remp.press/api/v1/mailers/mail-types?public_listing=1 \
   -H 'Authorization: Bearer XXX'
 ```
 
@@ -899,16 +1190,77 @@ Response:
 
 ```json5
 {
-    "status": "ok",
-    "data": [
-        {
-            "id": 14,
-            "code": "alerts",
-            "title": "Breaking news"
-        }
-        // ...
-    ]
+  "status": "ok",
+  "data": [
+    {
+      "id": 2,
+      "code": "123",
+      "image_url": "",
+      "preview_url": "",
+      "title": "Test",
+      "description": "",
+      "locked": false,
+      "is_multi_variant": true,
+      "variants": {
+        "4": "test2",
+        "5": "test4"
+      }
+    },
+    {
+      "id": 1,
+      "code": "demo-weekly-newsletter",
+      "image_url": null,
+      "preview_url": null,
+      "title": "DEMO Weekly newsletter",
+      "description": "Example mail list",
+      "locked": false,
+      "is_multi_variant": true,
+      "variants": {
+        "2": "test",
+        "3": "test2"
+      }
+    }
+  ]
 }
+```
+
+---
+
+#### GET `/api/v1/mailers/mail-type-categories`
+
+Get available categories of newsletters.
+
+##### *Headers:*
+
+| Name | Value | Required | Description |
+| --- |---| --- | --- |
+| Authorization | Bearer *String* | yes | API token. |
+
+##### *Example:*
+
+```shell
+curl -X GET \
+  http://mailer.remp.press/api/v1/mailers/mail-type-categories \
+  -H 'Authorization: Bearer XXX'
+```
+
+Response:
+
+```json5
+[
+  {
+    "id": 1,
+    "title": "Newsletters",
+    "sorting": 100,
+    "show_title": true
+  },
+  {
+    "id": 2,
+    "title": "System",
+    "sorting": 999,
+    "show_title": false
+  }
+]
 ```
 
 ---
@@ -917,8 +1269,8 @@ Response:
 
 Creates or updates mail type (newsletter list). Endpoint complements creation of newsletter list via web interface.
 
-If existing `id`/`code` is provided, API handler updates existing record, otherwise new record is created. Field `id`
-has higher precedence in finding the existing record.
+If existing `id`/`code` is provided, API handler updates existing record, otherwise a record is created. 
+Field `id` has higher precedence in finding the existing record.
 
 ##### *Headers:*
 
@@ -989,6 +1341,90 @@ Response:
 }
 ```
 
+---
+
+#### GET `/api/v1/mailers/mail-templates`
+
+Get available mail templates. Possible filtering by `mail_type_code` to get only emails belonging to specified newsletter lists.
+
+##### *Headers:*
+
+| Name | Value | Required | Description |
+| --- |---| --- | --- |
+| Authorization | Bearer *String* | yes | API token. |
+
+##### *Example:*
+
+```shell
+curl -X GET \
+  http://mailer.remp.press/api/v1/mailers/mail-templates \
+  -H 'Authorization: Bearer XXX'
+```
+
+Response:
+
+```json5
+[
+  {
+      "code": "email_1",
+      "name": "Welcome email",
+      "description": "Email sent after new registration",
+      "mail_type_code": "system"
+  },
+  {
+      "code": "email_2",
+      "name": "Reset password",
+      "description": "Email sent after new password was requested",
+      "mail_type_code": "system"
+  }
+]
+```
+---
+
+#### GET `/api/v1/mailers/templates`
+
+Gets list of available email templates.
+
+##### *Headers:*
+
+| Name | Value | Required | Description |
+| --- |---| --- | --- |
+| Authorization | Bearer *String* | yes | API token. |
+
+##### *Params:*
+
+| Name | Value | Required | Description |
+| --- |---| --- | --- |
+| mail_type_codes | *String[]* | no | If provided, list only email templates for given mail_type codes. 
+| with_mail_types | *Boolean* | no | If true, each returned email template contains additional parameters about assigned mail_type.
+
+##### *Example:*
+
+```shell
+curl --location --request GET \
+'mailer.remp.press/api/v1/mailers/templates?mail_type_codes[]=onboarding&mail_type_codes[]=system&with_mail_types=true' \
+--header 'Content-Type: application/x-www-form-urlencoded' \
+--header 'Accept: application/json' \
+--header 'Authorization: Bearer XXX' \
+```
+
+Response:
+
+```json5
+[
+    {
+        "code": "reset_password",
+        "name": "Password reset",
+        "mail_type_code": "system",
+        "mail_type": {
+            "code": "system",
+            "title": "System emails",
+            "description": "important notifications",
+            "sorting": 1
+        }
+    }
+]
+```
 ---
 
 #### POST `/api/v1/mailers/templates`
@@ -1269,14 +1705,14 @@ Response:
 Transformed `data` can be then used as parameters of `/api/v1/mailers/generate-mail` endpoint.
 
 As of the writing of this description, not all generators are required to provide preprocessing of parameters.
-It's responsible of the caller to know whether the source template uses generator that can *preprocess* parameters.
-If the *preprocess* is called for generator not supporting it, *HTTP 400 Bad Request* is returned with error message.
+It's a responsibility of the caller to know whether the source template uses generator that can *preprocess* parameters.
+If the *preprocess* is called for a generator not supporting it, *HTTP 400 Bad Request* is returned with error message.
 
 ---
 
 #### POST `/api/v1/mailers/mailgun`
 
-Webhook endpoint for legacy Mailgun event reporting. We advise to use `v2` of this endpoint and new implementation
+Webhook endpoint for legacy Mailgun event reporting. We advise using `v2` of this endpoint and new implementation
 of webhooks on Mailgun.
 
 You can configure Mailgun webhooks in the Mailgun's [control panel](https://app.mailgun.com/app/webhooks). For more
@@ -1470,11 +1906,14 @@ There are three methods to implement:
 * `provider(): string`: Uniquely identifies segment provider among other segment providers.
 This is internally required to namespace segment names in case of same segment name being used in multiple
 segment sources.
+
     ```php
     return "my-provider"; 
     ```
+
 * `list(): array`: Returns list of all segments available for this provider. The structure
 of response is:
+
     ```php
     return [
         [
@@ -1489,15 +1928,20 @@ of response is:
         ],
     ];
     ``` 
+  
 * `users($segment): array`: Returns list of user IDs belonging to the segment.
-  * `$segment`: Identification of requested segment.
-    ```php
-    [
-        'provider' => String, // identification of segment provider 
-        'code' => String, // segment code
-    ]
-    ```
+
+  * `$segment`: Identification of requested segment. 
+ 
+  ```php
+  [
+      'provider' => String, // identification of segment provider 
+      'code' => String, // segment code
+  ]
+  ```
+    
   The response is than expected to be array of integers/strings representing user IDs:
+  
   ```php
   return [
       Integer,
@@ -1513,7 +1957,7 @@ example.
 
 ##### REMP CRM implementation
 
-See the [`Remp\MailerModule\Users\Segment`](app/models/Users/Segment.php) implementation to check how you can
+See the [`Remp\MailerModule\Segments\Crm`](app/models/Segments/Crm.php) implementation to check how you can
 initialize your class the dependencies, structure the request and process the result
 
 The constructor accept two parameters. They should come from `app/config/config.local.neon` file:
@@ -1536,7 +1980,7 @@ services:
 As segments are working only with user IDs, and some of them might not be valid or active anymore, Mailer
 requires an implementation that returns user information based on the ID.
 
-The implementation is required to implement [`Remp\MailerModule\Users\IUser`](app/models/Users/IUser.php)
+The implementation is required to implement [`Remp\MailerModule\Users\IUser`](app/models/Users/IUsers.php)
 interface.
 
 * `list($userIds, $page): array`: Returns the user information (primarily email address) for requested users based on
@@ -1615,7 +2059,7 @@ his/her email, Mailer needs to update that information too.
     
 * _Newsletter subscribe and unsubscribe_. Mailer doesn't provide frontend interface for subscribing
 and unsubscribing from newsletters - site owners tend to integrate this into their layout. Due to this
-Mailer provides APIs to subscribe and unsubscribe users from the newsletters
+Mailer provides APIs to subscribe and unsubscribe users from the newsletters.
 
   * [`/api/v1/users/subscribe`](#post-apiv1userssubscribe)
   * [`/api/v1/users/un-subscribe`](#post-apiv1usersun-subscribe)
@@ -1636,7 +2080,7 @@ You can select the default mailer on the settings page: http://mailer.remp.press
 
 You can add your own implementation of Mailer to the service of your choice.
 
-The implementation is required to extend [`Remp\MailerModule\Mailers\Mailer`](app/models/Users/Mailer.php)
+The implementation is required to extend [`Remp\MailerModule\Mailers\Mailer`](app/models/Mailers/Mailer.php)
 abstract class.
 
 * `protected $alias = String`: Class attribute for identification of implementation,
@@ -1646,7 +2090,7 @@ of options, that should be configurable via Mailer settings page
 * `supportsBatch(): bool`: Returns flag whether the implementation supports batch sending or each
 email should be sent individually
 * `transformTemplateParams($params)`: Mailer supports variable injection into the mail template by using `{{ variable }}`
-in the template. Some emailing services require to use specific variables in email template to support batch sending.
+in the template. Some emailing services require using specific variables in email template to support batch sending.
 Values for these variables are then usually provided in send API request and 3rd party service injects them right
 before sending.
 
@@ -1668,6 +2112,7 @@ before sending.
   ```
   
   And returns two arrays on output:
+  
   * Transformed params
   ```php
   [
@@ -1675,6 +2120,7 @@ before sending.
     "mail_sender_id": "%recipient.mail_sender_id",
   ]
   ```
+  
   * Key-value pairs
   ```php
   [
@@ -1758,7 +2204,7 @@ We recommend to use Systemd or Supervisord for handling them. Following are Syst
 This configures handler of all asynchronous events generated by application.
 
 Create systemd service definition in `/etc/systemd/system/remp-mailer-hermes-worker.service`. Alter the
-`ExecStart` line to reflect path to your installation.
+`ExecStart` line to reflect the path to your installation.
 
 ```
 # BEGIN remp-mailer-hermes-worker
@@ -1789,10 +2235,10 @@ sudo systemctl start remp-mailer-hermes-worker
 
 #### Mail sending (Mail worker)
 
-This configures handler responsible for actual sending of emails via configured mailer.
+This configures handler responsible for actual sending of emails via a configured mailer.
 
 Create systemd service definition in `/etc/systemd/system/remp-mailer-mail-worker.service`. Alter the
-`ExecStart` line to reflect path to your installation.
+`ExecStart` line to reflect the path to your installation.
 
 ```
 # BEGIN remp-mailer-mail-worker
@@ -1840,7 +2286,7 @@ Add following block to your crontab to execute the processing (alter the path ba
 #### Mail stats processing
 
 If the default mailer supports statistics (e.g. Mailgun) and the stats are being received, you can enable stats
-aggregation so they're displayed right in the job detail.
+aggregation, so they're displayed right in the job detail.
 
 ```
 * * * * * php /home/remp/workspace/remp/Mailer/bin/command.php mail:job-stats
@@ -1848,7 +2294,7 @@ aggregation so they're displayed right in the job detail.
 
 ### Authentication
 
-The default implementation authenticates via REMP SSO. However it is possible for Mailer
+The default implementation authenticates via REMP SSO. However, it is possible for Mailer
 to use external authentication without the need of having SSO installed.
 
 To replace REMP SSO with your custom authentication, you need to:
@@ -1897,5 +2343,43 @@ services:
 You can see that you override here two services with your own implementation. The third service
 uses default Nette implementation and overrides custom REMP SSO implementation defined in `config.neon`.
 
-From now on the authentication is not done by redirecting user to SSO but by using default sign in
-screen avaiable at http://mailer.remp.press/sign/in.
+From now on the authentication is not done by redirecting user to SSO but by using default sign in 
+screen available at http://mailer.remp.press/sign/in.
+
+### Error tracking
+
+Mailer comes with extension supporting tracking errors to Sentry. You can enable the tracking by setting following snippet to your `app/config/config.local.neon`:
+
+```neon
+extensions:
+    sentry: Rootpd\NetteSentry\DI\SentryExtension
+
+sentry:
+	dsn: https://0123456789abcdef0123456789abcdef@sentry.example.com/1
+	environment: development
+	user_fields:
+		- email
+```
+
+Please be aware, that the tracking works only if you have debug mode disabled.
+By default, debug mode is enabled only when `ENV` is set to `local`. 
+
+## Healthcheck
+
+Route `http://mailer.remp.press/health` provides health check for database, Redis, storage and logging.
+
+Returns:
+
+- **200 OK** and JSON with list of services _(with status "OK")_.
+- **500 Internal Server Error** and JSON with description of problem. E.g.:
+
+    ```
+    {
+      "status":"PROBLEM",
+      "log":{
+        "status":"PROBLEM",
+        "message":"Could not write to log file",
+        "context": // error or thrown exception...
+      //...
+    }
+    ```

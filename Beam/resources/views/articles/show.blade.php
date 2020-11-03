@@ -38,6 +38,10 @@
                                 <dd>{{$article->external_id}}</dd>
                             </dl>
                             <dl class="dl-horizontal">
+                                <dt>Content Type</dt>
+                                <dd>{{$article->content_type}}</dd>
+                            </dl>
+                            <dl class="dl-horizontal">
                                 <dt>URL</dt>
                                 <dd><a href="{{$article->url}}">{{$article->url}}</a></dd>
                             </dl>
@@ -51,6 +55,30 @@
                                     @foreach ($article->authors as $author)
                                         <a href="{{ route('authors.show', $author->id) }}">{{ $author->name }}</a>@if(!$loop->last), @endif
                                     @endforeach
+                                </dd>
+                            </dl>
+                            <dl class="dl-horizontal">
+                                <dt>Sections</dt>
+                                <dd>
+                                    @if($article->sections->count() > 0)
+                                        @foreach ($article->sections as $section)
+                                            {{ $section->name }}@if(!$loop->last), @endif
+                                        @endforeach
+                                    @else
+                                        -
+                                    @endif
+                                </dd>
+                            </dl>
+                            <dl class="dl-horizontal">
+                                <dt>Tags</dt>
+                                <dd>
+                                    @if($article->tags->count() > 0)
+                                        @foreach ($article->tags as $tag)
+                                            {{ $tag->name }}@if(!$loop->last), @endif
+                                        @endforeach
+                                    @else
+                                        -
+                                    @endif
                                 </dd>
                             </dl>
                             <dl class="dl-horizontal">
@@ -139,11 +167,14 @@
                 :url="url"
                 :variants-url="variantsUrl"
                 :snapshots-data-source="{{$snapshotsDataSource ? 'true' : 'false'}}"
+                :external-events="externalEvents"
                 ref="histogram" >
         </article-details>
 
     </div>
     <script type="text/javascript">
+
+
         new Vue({
             el: "#article-vue-wrapper",
             components: {
@@ -158,7 +189,8 @@
             data: function() {
                 return {
                     url: "{!! route('articles.timeHistogram.json', $article->id) !!}",
-                    variantsUrl: "{!! route('articles.variantsHistogram.json', $article->id) !!}"
+                    variantsUrl: "{!! route('articles.variantsHistogram.json', $article->id) !!}",
+                    externalEvents: {!! json_encode($externalEvents) !!},
                 }
             }
         })

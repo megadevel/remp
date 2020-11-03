@@ -44,6 +44,7 @@ class TemplatesRepository extends Repository
         $templateHtml,
         $layoutId,
         $typeId,
+        ?bool $clickTracking = null,
         $extras = null
     ) {
 
@@ -58,6 +59,7 @@ class TemplatesRepository extends Repository
             'from' => $from,
             'autologin' => true,
             'subject' => $subject,
+            'click_tracking' => $clickTracking,
             'mail_body_text' => $templateText,
             'mail_body_html' => $templateHtml,
             'mail_layout_id' => $layoutId,
@@ -162,5 +164,17 @@ class TemplatesRepository extends Repository
         }
 
         return $selection;
+    }
+
+    public function search(string $term, int $limit): \Nette\Database\Table\Selection
+    {
+        $searchable = ['code', 'name', 'subject', 'description'];
+        foreach ($searchable as $column) {
+            $where[$column . ' LIKE ?'] = '%' . $term . '%';
+        }
+
+        return $this->all()
+            ->whereOr($where ?? [])
+            ->limit($limit);
     }
 }

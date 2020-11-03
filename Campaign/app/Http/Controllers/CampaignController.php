@@ -9,24 +9,19 @@ use App\CampaignSegment;
 use App\Contracts\SegmentAggregator;
 use App\Contracts\SegmentException;
 use App\Country;
-use App\Helpers\Showtime;
 use App\Http\Request;
 use App\Http\Requests\CampaignRequest;
 use App\Http\Resources\CampaignResource;
+use App\Http\Showtime\ControllerShowtimeResponse;
+use App\Http\Showtime\Showtime;
 use App\Schedule;
 use Carbon\Carbon;
-use GeoIp2;
 use View;
 use HTML;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Log;
-use Illuminate\Support\Facades\Redis;
 use Yajra\Datatables\Datatables;
-use App\Models\Dimension\Map as DimensionMap;
-use App\Models\Position\Map as PositionMap;
-use App\Models\Alignment\Map as AlignmentMap;
-use DeviceDetector\DeviceDetector;
 
 class CampaignController extends Controller
 {
@@ -105,13 +100,20 @@ class CampaignController extends Controller
             })
             ->addColumn('segments', function (Campaign $campaign) use ($segments) {
                 $segmentNames = [];
+
+                $exclusiveIcon = '<i class="zmdi zmdi-eye-off" title="User must not be member of segment to see the campaign."></i>';
+                $inclusiveIcon = '<i class="zmdi zmdi-eye primary-color" title="User needs to be member of segment to see the campaign."></i>';
+
                 foreach ($campaign->segments as $segment) {
+                    $icon = $segment->inclusive ? $inclusiveIcon : $exclusiveIcon;
+
                     if ($segments->get($segment->code)) {
-                        $segmentNames[] = "- <span title='{$segment->code}'>{$segments->get($segment->code)}</span></em>";
+                        $segmentNames[] = "{$icon} <span title='{$segment->code}'>{$segments->get($segment->code)}</span></em>";
                     } else {
-                        $segmentNames[] = "- <span title='{$segment->code}'>{$segment->code}</span></em>";
+                        $segmentNames[] = "{$icon} <span title='{$segment->code}'>{$segment->code}</span></em>";
                     }
                 }
+
                 return $segmentNames;
             })
             ->addColumn('countries', function (Campaign $campaign) {
@@ -480,378 +482,24 @@ class CampaignController extends Controller
         return $processed;
     }
 
+
     /**
-     * @param Request $r
-     * @param DimensionMap $dm
-     * @param PositionMap $pm
-     * @param AlignmentMap $am
-     * @param SegmentAggregator $sa
+     * @param Request                    $request
+     * @param Showtime                   $showtime
+     * @param ControllerShowtimeResponse $controllerShowtimeResponse
+     *
      * @return JsonResponse
      */
     public function showtime(
-        Request $r,
-        DimensionMap $dm,
-        PositionMap $pm,
-        AlignmentMap $am,
-        SegmentAggregator $sa,
-        GeoIp2\Database\Reader $geoIPreader,
-        DeviceDetector $dd
+        Request $request,
+        Showtime $showtime,
+        ControllerShowtimeResponse $controllerShowtimeResponse
     ) {
+        $showtime->setRequest($request);
+        $data = $request->get('data');
+        $callback = $request->get('callback');
 
-        // validation
-        try {
-            $data = \GuzzleHttp\json_decode($r->get('data'));
-        } catch (\InvalidArgumentException $e) {
-            Log::warning('could not decode JSON in Campaign:Showtime. JSON string: "' . $r->get('data') . '"');
-            return response()
-                ->jsonp($r->get('callback'), [
-                    'success' => false,
-                    'errors' => ['invalid data json provided'],
-                ]);
-        }
-
-        $url = $data->url ?? null;
-        if (!$url) {
-            return response()
-                ->jsonp($r->get('callback'), [
-                    'success' => false,
-                    'errors' => ['url is required and missing'],
-                ]);
-        }
-
-        $userId = null;
-        if (isset($data->userId) || !empty($data->userId)) {
-            $userId = $data->userId;
-        }
-
-        $browserId = null;
-        if (isset($data->browserId) || !empty($data->browserId)) {
-            $browserId = $data->browserId;
-        }
-        if (!$browserId) {
-            return response()
-                ->jsonp($r->get('callback'), [
-                    'success' => false,
-                    'errors' => ['browserId is required and missing'],
-                ])
-                ->setStatusCode(400);
-        }
-
-        if (isset($data->cache)) {
-            $sa->setProviderData($data->cache);
-        }
-
-        $positions = $pm->positions();
-        $dimensions = $dm->dimensions();
-        $alignments = $am->alignments();
-
-        // Try to load one-time banners (they have precedence over campaigns)
-        $banner = null;
-        if ($userId) {
-            $banner = $this->showtime->loadOneTimeUserBanner($userId);
-        }
-        if (!$banner) {
-            $banner = $this->showtime->loadOneTimeBrowserBanner($browserId);
-        }
-        if ($banner) {
-            $renderedBanner =  View::make('banners.preview', [
-                'banner' => $banner,
-                'variantUuid' => '',
-                'campaignUuid' => '',
-                'positions' => $positions,
-                'dimensions' => $dimensions,
-                'alignments' => $alignments,
-                'controlGroup' => 0
-            ])->render();
-
-            return response()
-                ->jsonp($r->get('callback'), [
-                    'success' => true,
-                    'errors' => [],
-                    'data' => [$renderedBanner],
-                    'providerData' => $sa->getProviderData(),
-                ]);
-        }
-
-
-        $displayedCampaigns = [];
-
-        $campaignIds = json_decode(Redis::get(Campaign::ACTIVE_CAMPAIGN_IDS)) ?? [];
-        if (count($campaignIds) == 0) {
-            return response()
-                ->jsonp($r->get('callback'), [
-                    'success' => true,
-                    'data' => [],
-                    'providerData' => $sa->getProviderData(),
-                ]);
-        }
-
-        foreach ($campaignIds as $campaignId) {
-            /** @var Campaign $campaign */
-            $campaign = unserialize(Redis::get(Campaign::CAMPAIGN_TAG . ":{$campaignId}"));
-            $running = false;
-
-            foreach ($campaign->schedules as $schedule) {
-                if ($schedule->isRunning()) {
-                    $running = true;
-                    break;
-                }
-            }
-            if (!$running) {
-                continue;
-            }
-
-            /** @var Collection $campaignBanners */
-            $campaignBanners = $campaign->campaignBanners->keyBy('uuid');
-
-            // banner
-            if ($campaignBanners->count() == 0) {
-                Log::error("Active campaign [{$campaign->uuid}] has no banner set");
-                continue;
-            }
-
-            $bannerUuid = null;
-            $variantUuid = null;
-
-            // find variant previously displayed to user
-            $seenCampaignsBanners = $data->campaignsBanners ?? false;
-            if ($seenCampaignsBanners && isset($seenCampaignsBanners->{$campaign->uuid})) {
-                $bannerUuid = $seenCampaignsBanners->{$campaign->uuid}->bannerId ?? null;
-                $variantUuid = $seenCampaignsBanners->{$campaign->uuid}->variantId ?? null;
-            }
-
-            // fallback for older version of campaigns local storage data
-            // where decision was based on bannerUuid and not variantUuid (which was not present at all)
-            if ($bannerUuid && !$variantUuid) {
-                foreach ($campaignBanners as $campaignBanner) {
-                    if (optional($campaignBanner->banner)->uuid === $bannerUuid) {
-                        $variantUuid = $campaignBanner->uuid;
-                        break;
-                    }
-                }
-            }
-
-            /** @var CampaignBanner $seenVariant */
-            // unset seen variant if it was deleted
-            if (!($seenVariant = $campaignBanners->get($variantUuid))) {
-                $variantUuid = null;
-            }
-
-            // unset seen variant if its proportion is 0%
-            if ($seenVariant && $seenVariant->proportion === 0) {
-                $variantUuid = null;
-            }
-
-            // variant still not set, choose random variant
-            if ($variantUuid === null) {
-                $variantsMapping = $campaign->getVariantsProportionMapping();
-
-                $randVal = mt_rand(0, 100);
-                $currPercent = 0;
-
-                foreach ($variantsMapping as $uuid => $proportion) {
-                    $currPercent = $currPercent + $proportion;
-                    if ($currPercent >= $randVal) {
-                        $variantUuid = $uuid;
-                        break;
-                    }
-                }
-            }
-
-            /** @var CampaignBanner $variant */
-            $variant = $campaignBanners->get($variantUuid);
-            if (!$variant) {
-                Log::error("Unable to get CampaignBanner [{$variantUuid}] for campaign [{$campaign->uuid}]");
-                continue;
-            }
-
-            // check if campaign is set to be seen only once per session
-            // and check campaign UUID against list of campaigns seen by user
-            $campaignsSeen = $data->campaignsSeen ?? false;
-            if ($campaign->once_per_session && $campaignsSeen) {
-                $seen = false;
-                foreach ($campaignsSeen as $campaignSeen) {
-                    if ($campaignSeen->campaignId === $campaign->uuid) {
-                        $seen = true;
-                        break;
-                    }
-                }
-                if ($seen) {
-                    continue;
-                }
-            }
-
-            // signed in state
-            if (isset($campaign->signed_in) && $campaign->signed_in !== boolval($userId)) {
-                continue;
-            }
-
-            // using adblock?
-            if ($campaign->using_adblock !== null) {
-                if (!isset($data->usingAdblock)) {
-                    Log::error("Unable to load if user with ID [{$userId}] & browserId [{$browserId}] is using AdBlock.");
-                    continue;
-                }
-                if ($campaign->using_adblock && !$data->usingAdblock || $campaign->using_adblock === false && $data->usingAdblock) {
-                    continue;
-                }
-            }
-
-            // url filters
-            if ($campaign->url_filter === Campaign::URL_FILTER_EXCEPT_AT) {
-                foreach ($campaign->url_patterns as $urlPattern) {
-                    if (strpos($data->url, $urlPattern) !== false) {
-                        continue 2;
-                    }
-                }
-            }
-            if ($campaign->url_filter === Campaign::URL_FILTER_ONLY_AT) {
-                $matched = false;
-                foreach ($campaign->url_patterns as $urlPattern) {
-                    if (strpos($data->url, $urlPattern) !== false) {
-                        $matched = true;
-                    }
-                }
-                if (!$matched) {
-                    continue;
-                }
-            }
-
-            // referer filters
-            if ($campaign->referer_filter === Campaign::URL_FILTER_EXCEPT_AT && $data->referer) {
-                foreach ($campaign->referer_patterns as $refererPattern) {
-                    if (strpos($data->referer, $refererPattern) !== false) {
-                        continue 2;
-                    }
-                }
-            }
-            if ($campaign->referer_filter === Campaign::URL_FILTER_ONLY_AT) {
-                if (!$data->referer) {
-                    continue;
-                }
-                $matched = false;
-                foreach ($campaign->referer_patterns as $refererPattern) {
-                    if (strpos($data->referer, $refererPattern) !== false) {
-                        $matched = true;
-                    }
-                }
-                if (!$matched) {
-                    continue;
-                }
-            }
-
-            // device rules
-            if (!isset($data->userAgent)) {
-                Log::error("Unable to load user agent for userId [{$userId}] & browserId [{$browserId}]");
-            } else {
-                $dd->setUserAgent($data->userAgent);
-                $dd->parse();
-
-                if (!in_array(Campaign::DEVICE_MOBILE, $campaign->devices) && $dd->isMobile()) {
-                    continue;
-                }
-
-                if (!in_array(Campaign::DEVICE_DESKTOP, $campaign->devices) && $dd->isDesktop()) {
-                    continue;
-                }
-            }
-
-            // country rules
-            if (!$campaign->countries->isEmpty()) {
-                // load country ISO code based on IP
-                try {
-                    $record = $geoIPreader->country($r->ip());
-                    $countryCode = $record->country->isoCode;
-                } catch (\MaxMind\Db\Reader\InvalidDatabaseException | GeoIp2\Exception\AddressNotFoundException $e) {
-                    Log::error("Unable to load country for campaign [{$campaign->uuid}] with country rules: " . $e->getMessage());
-                    continue;
-                }
-                if (is_null($countryCode)) {
-                    Log::error("Unable to load country for campaign [{$campaign->uuid}] with country rules");
-                    continue;
-                }
-
-                // check against white / black listed countries
-
-                if (!$campaign->countriesBlacklist->isEmpty() && $campaign->countriesBlacklist->contains('iso_code', $countryCode)) {
-                    continue;
-                }
-                if (!$campaign->countriesWhitelist->isEmpty() && !$campaign->countriesWhitelist->contains('iso_code', $countryCode)) {
-                    continue;
-                }
-            }
-
-            // segment
-            foreach ($campaign->segments as $campaignSegment) {
-                $campaignSegment->setRelation('campaign', $campaign); // setting this manually to avoid DB query
-
-                if ($userId) {
-                    if (!$sa->checkUser($campaignSegment, strval($userId))) {
-                        continue 2;
-                    }
-                } else {
-                    if (!$sa->checkBrowser($campaignSegment, strval($browserId))) {
-                        continue 2;
-                    }
-                }
-            }
-
-            // pageview rules
-            $pageviewCount = $data->pageviewCount ?? null;
-            if ($pageviewCount !== null && $campaign->pageview_rules !== null) {
-                foreach ($campaign->pageview_rules as $rule) {
-                    if (!$rule['num'] || !$rule['rule']) {
-                        continue;
-                    }
-
-                    switch ($rule['rule']) {
-                        case Campaign::PAGEVIEW_RULE_EVERY:
-                            if ($pageviewCount % $rule['num'] !== 0) {
-                                continue 3;
-                            }
-                            break;
-                        case Campaign::PAGEVIEW_RULE_SINCE:
-                            if ($pageviewCount < $rule['num']) {
-                                continue 3;
-                            }
-                            break;
-                        case Campaign::PAGEVIEW_RULE_BEFORE:
-                            if ($pageviewCount >= $rule['num']) {
-                                continue 3;
-                            }
-                            break;
-                    }
-                }
-            }
-
-
-            $displayedCampaigns[] = View::make('banners.preview', [
-                'banner' => $variant->banner,
-                'variantUuid' => $variant->uuid,
-                'campaignUuid' => $campaign->uuid,
-                'positions' => $positions,
-                'dimensions' => $dimensions,
-                'alignments' => $alignments,
-                'controlGroup' => $variant->control_group
-            ])->render();
-        }
-
-        if (empty($displayedCampaigns)) {
-            return response()
-                ->jsonp($r->get('callback'), [
-                    'success' => true,
-                    'data' => [],
-                    'providerData' => $sa->getProviderData(),
-                ]);
-        }
-
-        return response()
-            ->jsonp($r->get('callback'), [
-                'success' => true,
-                'errors' => [],
-                'data' => $displayedCampaigns,
-                'providerData' => $sa->getProviderData(),
-            ]);
+        return $showtime->showtime($data, $callback, $controllerShowtimeResponse);
     }
 
     public function saveCampaign(Campaign $campaign, array $data)
@@ -880,6 +528,7 @@ class CampaignController extends Controller
             $campaignSegment->code = $r['code'];
             $campaignSegment->provider = $r['provider'];
             $campaignSegment->campaign_id = $campaign->id;
+            $campaignSegment->inclusive = $r['inclusive'];
             $campaignSegment->save();
         }
 
@@ -970,7 +619,7 @@ class CampaignController extends Controller
         Request $request
     ) {
         $variants = $campaign->campaignBanners()->withTrashed()->with("banner")->get();
-        $from = $request->input('from', 'now - 2 days');
+        $from = $request->input('from', 'today - 2 days');
         $to = $request->input('to', 'now');
 
         $variantBannerLinks = [];

@@ -4,11 +4,12 @@ namespace App\Http\Controllers;
 
 use App\Article;
 use App\ArticleAuthor;
-use App\ArticlePageviews;
-use App\ArticleTimespent;
 use App\Author;
 use App\Conversion;
+use App\Http\Requests\TopSearchRequest;
 use App\Http\Resources\AuthorResource;
+use App\Model\Pageviews\TopSearch;
+use App\Model\Tag;
 use App\Section;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Http\Request;
@@ -24,9 +25,9 @@ class AuthorController extends Controller
         return response()->format([
             'html' => view('authors.index', [
                 'authors' => Author::all()->pluck('name', 'id'),
-                'publishedFrom' => $request->input('published_from', 'now - 30 days'),
+                'publishedFrom' => $request->input('published_from', 'today - 30 days'),
                 'publishedTo' => $request->input('published_to', 'now'),
-                'conversionFrom' => $request->input('conversion_from', 'now - 30 days'),
+                'conversionFrom' => $request->input('conversion_from', 'today - 30 days'),
                 'conversionTo' => $request->input('conversion_to', 'now'),
             ]),
             'json' => AuthorResource::collection(Author::paginate()),
@@ -39,9 +40,10 @@ class AuthorController extends Controller
             'html' => view('authors.show', [
                 'author' => $author,
                 'sections' => Section::all()->pluck('name', 'id'),
-                'publishedFrom' => $request->input('published_from', 'now - 30 days'),
+                'tags' => Tag::all()->pluck('name', 'id'),
+                'publishedFrom' => $request->input('published_from', 'today - 30 days'),
                 'publishedTo' => $request->input('published_to', 'now'),
-                'conversionFrom' => $request->input('conversion_from', 'now - 30 days'),
+                'conversionFrom' => $request->input('conversion_from', 'today - 30 days'),
                 'conversionTo' => $request->input('conversion_to', 'now'),
             ]),
             'json' => new AuthorResource($author),
@@ -200,9 +202,10 @@ class AuthorController extends Controller
             'timespent_signed_in / pageviews_signed_in as avg_timespent_signed_in',
             'timespent_subscribers / pageviews_subscribers as avg_timespent_subscribers',
         ]))
-            ->with(['authors', 'sections'])
+            ->with(['authors', 'sections', 'tags'])
             ->join('article_author', 'articles.id', '=', 'article_author.article_id')
             ->leftJoin('article_section', 'articles.id', '=', 'article_section.article_id')
+            ->leftJoin('article_tag', 'articles.id', '=', 'article_tag.article_id')
             ->where([
                 'article_author.author_id' => $author->id
             ])
@@ -320,10 +323,18 @@ class AuthorController extends Controller
                 return $amounts ?? [0];
             })
             ->filterColumn('sections[, ].name', function (Builder $query, $value) {
-                $values = explode(",", $value);
+                $values = explode(',', $value);
                 $filterQuery = \DB::table('sections')
                     ->join('article_section', 'articles.id', '=', 'article_section.article_id', 'left')
                     ->whereIn('article_section.author_id', $values);
+                $articleIds = $filterQuery->pluck('articles.id')->toArray();
+                $query->whereIn('articles.id', $articleIds);
+            })
+            ->filterColumn('tags[, ].name', function (Builder $query, $value) {
+                $values = explode(',', $value);
+                $filterQuery = \DB::table('tags')
+                    ->join('article_tag', 'articles.id', '=', 'article_tag.article_id', 'left')
+                    ->whereIn('article_tag.author_id', $values);
                 $articleIds = $filterQuery->pluck('articles.id')->toArray();
                 $query->whereIn('articles.id', $articleIds);
             })
@@ -334,5 +345,25 @@ class AuthorController extends Controller
             ->orderColumn('conversions_sum', 'conversions_sum $1')
             ->orderColumn('conversions_avg', 'conversions_avg $1')
             ->make(true);
+    }
+
+    public function topAuthors(TopSearchRequest $request, TopSearch $topSearch)
+    {
+        $limit = $request->json('limit');
+        $timeFrom = Carbon::parse($request->json('from'));
+
+        $sections = $request->json('sections');
+        $sectionValueType = null;
+        $sectionValues = null;
+        if (isset($sections['external_id'])) {
+            $sectionValueType = 'external_id';
+            $sectionValues = $sections['external_id'];
+        } elseif (isset($sections['name'])) {
+            $sectionValueType = 'name';
+            $sectionValues = $sections['name'];
+        }
+        $contentType = $request->json('content_type');
+
+        return response()->json($topSearch->topAuthors($timeFrom, $limit, $sectionValueType, $sectionValues, $contentType));
     }
 }

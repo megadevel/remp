@@ -45,7 +45,7 @@ class NovydenikNewsfilterGenerator implements IGenerator
             new InputParam(InputParam::TYPE_POST, 'newsfilter_html', InputParam::REQUIRED),
             new InputParam(InputParam::TYPE_POST, 'title', InputParam::REQUIRED),
             new InputParam(InputParam::TYPE_POST, 'editor', InputParam::REQUIRED),
-            new InputParam(InputParam::TYPE_POST, 'summary', InputParam::REQUIRED),
+            new InputParam(InputParam::TYPE_POST, 'summary', InputParam::OPTIONAL),
             new InputParam(InputParam::TYPE_POST, 'from', InputParam::REQUIRED),
         ];
     }
@@ -91,7 +91,7 @@ class NovydenikNewsfilterGenerator implements IGenerator
             '/<p.*?>(.*?)<\/p>/is' => "$1",
 
             // replace em-s
-            "/<em.*?>(.*?)<\/em>/is" => "<i style=\"margin:0 0 0 26px;Margin:0 0 0 26px;color:#181818;padding:0;margin:0;Margin:0;line-height:1.3;font-size:18px;line-height:1.6;margin-bottom:26px;Margin-bottom:26px;line-height:160%;text-align:left;font-weight:normal;word-wrap:break-word;-webkit-hyphens:auto;-moz-hyphens:auto;hyphens:auto;border-collapse:collapse !important;\">$1</i><br>",
+            "/<em.*?>(.*?)<\/em>/is" => "<i>$1</i>",
 
             // remove new lines from inside caption shortcode
             "/\[caption.*?\/caption\]/is" => function ($matches) {
@@ -308,9 +308,9 @@ HTML;
 HTML;
 
         $hrTemplate = <<< HTML
-    <table cellspacing="0" cellpadding="0" border="0" width="100%" style="border-spacing:0;border-collapse:collapse;vertical-align:top;color:#181818;padding:0;margin:0;Margin:0;line-height:1.3;text-align:left;font-family:'Helvetica Neue', Helvetica, Arial;width:100%;">
-        <tr style="padding:0;vertical-align:top;text-align:left;">
-            <td style="padding:0;vertical-align:top;text-align:left;font-size:18px;line-height:1.6;border-collapse:collapse !important; padding: 30px 0 0 0; border-top:1px solid #E2E2E2;"></td>
+    <table cellspacing="0" cellpadding="0" border="0" width="100%" style="border-spacing:0;border-collapse:collapse;vertical-align:top;color:#181818;padding:0;margin:0;Margin:0;line-height:1.3;text-align:left;font-family:'Helvetica Neue', Helvetica, Arial;width:100%;min-width:100%;">
+        <tr style="padding:0;vertical-align:top;text-align:left;width:100%;min-width:100%;">
+            <td style="padding:0;vertical-align:top;text-align:left;font-size:18px;line-height:1.6;border-collapse:collapse !important; padding: 30px 0 0 0; border-top:1px solid #E2E2E2;height:0;line-height: 0;width:100%;min-width:100%;">&#xA0;</td>
         </tr>
     </table>
 

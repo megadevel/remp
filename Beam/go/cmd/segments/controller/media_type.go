@@ -1,15 +1,15 @@
 package controller
 
 import (
+	"beam/cmd/segments/app"
+	"beam/model"
 	"encoding/json"
 	"fmt"
 	"strconv"
 	"strings"
 
+	uuid "github.com/gofrs/uuid"
 	"github.com/pkg/errors"
-	uuid "github.com/satori/go.uuid"
-	"gitlab.com/remp/remp/Beam/go/cmd/segments/app"
-	"gitlab.com/remp/remp/Beam/go/model"
 )
 
 // Segment represents segment information stored in storage.
@@ -262,6 +262,9 @@ func (e *Event) ToMediaType() (*app.Event, error) {
 	if e.URL != "" {
 		event.User.URL = &e.URL
 	}
+	if e.ArticleID != "" {
+		event.ArticleID = &e.ArticleID
+	}
 	if e.UserAgent != "" {
 		event.User.UserAgent = &e.UserAgent
 	}
@@ -320,6 +323,9 @@ func (c *Commerce) ToMediaType() (*app.Commerce, error) {
 	}
 	if c.IP != "" {
 		event.User.IPAddress = &c.IP
+	}
+	if c.BrowserID != "" {
+		event.User.BrowserID = &c.BrowserID
 	}
 	if c.UserID != "" {
 		event.User.ID = &c.UserID

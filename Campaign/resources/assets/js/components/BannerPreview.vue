@@ -175,6 +175,31 @@
               :transition="transition"
               :displayType="displayType"
         ></html-overlay-preview>
+
+        <overlay-two-buttons-signature-preview v-if="template === 'overlay_two_buttons_signature'"
+                                               :alignmentOptions="alignmentOptions"
+                                               :show="visible"
+                                               :uuid="uuid"
+                                               :campaignUuid="campaignUuid"
+
+                                               :textBefore="overlayTwoButtonsSignatureTemplate.textBefore"
+                                               :textAfter="overlayTwoButtonsSignatureTemplate.textAfter"
+                                               :textBtnPrimary="overlayTwoButtonsSignatureTemplate.textBtnPrimary"
+                                               :textBtnPrimaryMinor="overlayTwoButtonsSignatureTemplate.textBtnPrimaryMinor"
+                                               :textBtnSecondary="overlayTwoButtonsSignatureTemplate.textBtnSecondary"
+                                               :textBtnSecondaryMinor="overlayTwoButtonsSignatureTemplate.textBtnSecondaryMinor"
+                                               :targetUrlSecondary="overlayTwoButtonsSignatureTemplate.targetUrlSecondary"
+                                               :signatureImageUrl="overlayTwoButtonsSignatureTemplate.signatureImageUrl"
+                                               :textSignature="overlayTwoButtonsSignatureTemplate.textSignature"
+
+                                               :targetUrl="targetUrl"
+                                               :closeable="closeable"
+                                               :closeText="closeText"
+                                               :transition="transition"
+                                               :displayType="displayType"
+
+                                               :adminPreview="adminPreview"
+        ></overlay-two-buttons-signature-preview>
     </div>
 </template>
 
@@ -187,6 +212,7 @@
     import ShortMessagePreview from "./previews/ShortMessage";
     import OverlayRectanglePreview from "./previews/OverlayRectangle";
     import HtmlOverlayPreview from "./previews/HtmlOverlay";
+    import OverlayTwoButtonsSignaturePreview from "./previews/OverlayTwoButtonsSignature";
 
     import lib from "remp/js/remplib.js";
 
@@ -219,6 +245,7 @@
         "shortMessageTemplate",
         "overlayRectangleTemplate",
         "htmlOverlayTemplate",
+        "overlayTwoButtonsSignatureTemplate",
 
         "alignmentOptions",
         "dimensionOptions",
@@ -231,6 +258,7 @@
         "js",
         "jsIncludes",
         "cssIncludes",
+        "manualEventsTracking",
     ];
 
     export default {
@@ -242,6 +270,7 @@
             ShortMessagePreview,
             OverlayRectanglePreview,
             HtmlOverlayPreview,
+            OverlayTwoButtonsSignaturePreview
         },
         name: 'banner-preview',
         props: props,
@@ -261,17 +290,16 @@
 
             this.visible = this.show;
 
-            let cssIncludes = this.cssIncludes.filter(cssInclude => cssInclude);
+            let cssIncludes = (this.cssIncludes) ? this.cssIncludes.filter(cssInclude => cssInclude) : [];
             if (cssIncludes && cssIncludes.length > 0) {
                 for (let ii = 0; ii < cssIncludes.length; ii++) {
                     lib.loadStyle(cssIncludes[ii]);
                 }
             }
 
-            let jsIncludes = this.jsIncludes.filter(jsInclude => jsInclude);
+            let jsIncludes = (this.jsIncludes) ? this.jsIncludes.filter(jsInclude => jsInclude) : [];
             if (jsIncludes && jsIncludes.length > 0) {
                 let loadedScriptsCount = 0;
-
                 jsIncludes.forEach((jsInclude) => {
                     lib.loadScript(jsInclude, () => {
                         loadedScriptsCount += 1;
@@ -396,7 +424,7 @@
 				this.$parent.$emit('values-changed', [
                     {key: "show", val: false}
                 ]);
-                if (this.closeTracked) {
+                if (this.manualEventsTracking || this.closeTracked) {
                     return true;
                 }
                 this.trackEvent("banner", "close", null, null, {
@@ -409,7 +437,7 @@
                 this.closeTracked = true;
             },
             clicked: function(event, hideBanner = false) {
-                if (this.clickTracked) {
+                if (this.manualEventsTracking || this.clickTracked) {
                     return true;
                 }
                 this.trackEvent("banner", "click", null, null, {
@@ -444,16 +472,30 @@
                 return false;
             },
             runCustomJavascript: function (js) {
+                let that = this;
                 this.$nextTick(() => {
                     setTimeout(function() {
                         try {
-                            eval('(function() {' + js + '})()');
+                            // Evaluating JS code using Function with passed params object
+                            // https://stackoverflow.com/questions/49125059/how-to-pass-parameters-to-an-eval-based-function-injavascript
+                            let body = 'function(params) { ' + js + ' }';
+                            let wrap = s => "{ return " + body + " };";
+                            let func = new Function(wrap(body));
+                            func.call(null).call(null, that.paramsForCustomJavascript());
                         } catch(err) {
                             console.warn("unable to execute custom banner JS:", js);
                             console.warn(err);
                         }
                     }, 0);
                 }, this)
+            },
+            paramsForCustomJavascript: function () {
+                return {
+                    "utmMedium": this.displayType,
+                    "utmCampaign": this.campaignUuid,
+                    "utmContent": this.uuid,
+                    "bannerVariant": this.variantUuid
+                }
             }
         }
     }

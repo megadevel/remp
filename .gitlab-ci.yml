@@ -14,9 +14,17 @@ syntax:7.3:
   script:
     - make syntax
 
+syntax:7.4:
+  stage: test
+  image: php:7.4-cli
+  tags:
+    - docker
+  script:
+    - make syntax
+
 sniffer:
   stage: test
-  image: remp/php-ci:7.2.25
+  image: remp/php-ci:7.3.15
   tags:
     - docker
   script:
@@ -25,13 +33,32 @@ sniffer:
 
 phpstan:
   stage: test
-  image: remp/php-ci:7.2.25
+  image: remp/php-ci:7.3.15
   tags:
     - docker
   script:
     - make composer-install
     - make phpstan
 
+tests:
+  stage: test
+  image: remp/php-ci:7.3.15
+  tags:
+    - docker
+  script:
+    - make composer-install
+    - make copy-env    
+    - make phpunit
+  services:
+    - name: mysql:5.7.21
+      alias: mysql
+    - name: redis:3.2
+      alias: redis
+  variables:
+      MYSQL_DATABASE: remp_test
+      MYSQL_ROOT_PASSWORD: secret
+      REDIS_PORT: 6379
+      
 mailer/🇸🇰:
   stage: deploy
   script:

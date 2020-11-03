@@ -9,8 +9,11 @@ then
 
     composer install
 
-    yarn install --no-bin-links
+    yarn install
     chmod -R u+x node_modules
+
+    yarn link --cwd ../Package/remp
+    yarn link remp
 
     npm run | grep "all-dev"
     if [ $? -eq "0" ]; then

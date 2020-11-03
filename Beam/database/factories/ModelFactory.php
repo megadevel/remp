@@ -86,11 +86,18 @@ $factory->define(\App\Section::class, function (Faker\Generator $faker) {
     ];
 });
 
+$factory->define(\App\Model\Tag::class, function (Faker\Generator $faker) {
+    return [
+        'name' => $faker->domainWord,
+    ];
+});
+
 $factory->define(\App\Article::class, function (Faker\Generator $faker) {
     return [
         'external_id' => $faker->uuid,
         'title' => $faker->words(5, true),
         'url' => $faker->url,
+        'content_type' => 'article',
         'image_url' => $faker->imageUrl(),
         'published_at' => $faker->dateTimeBetween('-30 days', 'now')->format(DATE_RFC3339),
         'pageviews_all' => $faker->numberBetween(0, 20000),
@@ -201,9 +208,7 @@ $factory->define(\App\Model\ArticleViewsSnapshot::class, function (Faker\Generat
         'time' => Carbon::now(),
         'property_token' => $faker->uuid,
         'external_article_id' => $faker->numberBetween(9999, 10000000),
-        'derived_referer_medium' => $refererMediums[array_rand($refererMediums)],
-        'explicit_referer_medium' => null,
-        'count' => $faker->numberBetween(1, 1000),
-        'count_by_referer' => '{}',
+        'referer_medium' => $refererMediums[array_rand($refererMediums)],
+        'count' => $faker->numberBetween(1, 1000)
     ];
 });

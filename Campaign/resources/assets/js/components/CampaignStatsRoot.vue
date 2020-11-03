@@ -4,6 +4,7 @@
 
             <campaign-stats
                 :name="name"
+                :edit-link="editLink"
                 :data="campaignData"
                 :error="error"
                 :loading="loading"
@@ -59,6 +60,10 @@
             required: true
         },
         name: {
+            type: String,
+            required: true,
+        },
+        editLink: {
             type: String,
             required: true,
         },
@@ -146,7 +151,6 @@
                         from: vm.from,
                         to: vm.to,
                         tz: vm.timezone,
-                        chartWidth: $('.variant-chart-wrap').first().width(),
                         _token: document.head.querySelector("[name=csrf-token]").content
                     },
                     dataType: 'JSON',

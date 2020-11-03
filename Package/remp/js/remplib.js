@@ -132,11 +132,11 @@ export default {
      * Tries to retrieve key's value from localStorage
      * Side effect of this function is an extension of key's lifetime in the storage
      * @param key
-     * @param bypassThreshold
+     * @param bypassExpireThreshold ignore key's value expiration (given by cacheThreshold)
      * @param storeToCookie
      * @returns {*}
      */
-    getFromStorage: function(key, bypassThreshold, storeToCookie) {
+    getFromStorage: function(key, bypassExpireThreshold, storeToCookie) {
         let now = new Date();
         let data = localStorage.getItem(key);
         if (data === null) {
@@ -145,7 +145,7 @@ export default {
 
         let item = JSON.parse(data);
         let threshold = new Date(now.getTime() - this.cacheThreshold);
-        if (!bypassThreshold && (new Date(item.updatedAt)).getTime() < threshold.getTime()) {
+        if (!bypassExpireThreshold && (new Date(item.updatedAt)).getTime() < threshold.getTime()) {
             localStorage.removeItem(key);
             return null;
         }
@@ -178,23 +178,77 @@ export default {
         document.cookie = key + "=" + expires + "; path=/"+ domain + ";";
     },
 
-    extend: function() {
-        let a, b, c, f, l, g = arguments[0] || {}, k = 1, v = arguments.length, n = !1;
-        "boolean" === typeof g && (n = g,
-            g = arguments[1] || {},
-            k = 2);
-        "object" === typeof g || d.isFunction(g) || (g = {});
-        v === k && (g = this,
-            --k);
-        for (; k < v; k++)
-            if (null != (a = arguments[k]))
-                for (b in a)
-                    c = g[b],
-                        f = a[b],
-                    g !== f && (n && f && (d.isPlainObject(f) || (l = d.isArray(f))) ? (l ? (l = !1,
-                        c = c && d.isArray(c) ? c : []) : c = c && d.isPlainObject(c) ? c : {},
-                        g[b] = d.extend(n, c, f)) : void 0 !== f && (g[b] = f));
-        return g
+    // jquery extend
+    extend: function () {
+        var options, name, src, copy, copyIsArray, clone,
+            target = arguments[0] || {},
+            i = 1,
+            length = arguments.length,
+            deep = false;
+
+        // Handle a deep copy situation
+        if (typeof target === "boolean") {
+            deep = target;
+
+            // Skip the boolean and the target
+            target = arguments[i] || {};
+            i++;
+        }
+
+        // Handle case when target is a string or something (possible in deep copy)
+        if (typeof target !== "object" && !isFunction(target)) {
+            target = {};
+        }
+
+        // Extend jQuery itself if only one argument is passed
+        if (i === length) {
+            target = this;
+            i--;
+        }
+
+        for (; i < length; i++) {
+
+            // Only deal with non-null/undefined values
+            if ((options = arguments[i]) != null) {
+
+                // Extend the base object
+                for (name in options) {
+                    copy = options[name];
+
+                    // Prevent Object.prototype pollution
+                    // Prevent never-ending loop
+                    if (name === "__proto__" || target === copy) {
+                        continue;
+                    }
+
+                    // Recurse if we're merging plain objects or arrays
+                    if (deep && copy && (jQuery.isPlainObject(copy) ||
+                        (copyIsArray = Array.isArray(copy)))) {
+                        src = target[name];
+
+                        // Ensure proper type for the source value
+                        if (copyIsArray && !Array.isArray(src)) {
+                            clone = [];
+                        } else if (!copyIsArray && !jQuery.isPlainObject(src)) {
+                            clone = {};
+                        } else {
+                            clone = src;
+                        }
+                        copyIsArray = false;
+
+                        // Never move original objects, clone them
+                        target[name] = jQuery.extend(deep, clone, copy);
+
+                        // Don't bring in undefined values
+                    } else if (copy !== undefined) {
+                        target[name] = copy;
+                    }
+                }
+            }
+        }
+
+        // Return the modified object
+        return target;
     },
 
     bootstrap: function(app) {

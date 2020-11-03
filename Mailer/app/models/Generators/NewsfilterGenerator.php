@@ -20,7 +20,7 @@ class NewsfilterGenerator implements IGenerator
 
     private $content;
 
-    private $linksColor = "#b00c28";
+    private $linksColor = "#1F3F83";
 
     private $embedParser;
 
@@ -48,7 +48,7 @@ class NewsfilterGenerator implements IGenerator
             new InputParam(InputParam::TYPE_POST, 'url', InputParam::REQUIRED),
             new InputParam(InputParam::TYPE_POST, 'title', InputParam::REQUIRED),
             new InputParam(InputParam::TYPE_POST, 'editor', InputParam::REQUIRED),
-            new InputParam(InputParam::TYPE_POST, 'summary', InputParam::REQUIRED),
+            new InputParam(InputParam::TYPE_POST, 'summary', InputParam::OPTIONAL),
             new InputParam(InputParam::TYPE_POST, 'from', InputParam::REQUIRED),
         ];
     }
@@ -65,10 +65,6 @@ class NewsfilterGenerator implements IGenerator
 
         $post = $values->newsfilter_html;
         $post = $this->parseOls($post);
-
-        if ($sourceTemplate->code === 'newsfilter-sport') {
-            $this->linksColor = '#00A251';
-        }
 
         $lockedPost = $this->articleLocker->getLockedPost($post);
 
@@ -94,6 +90,10 @@ class NewsfilterGenerator implements IGenerator
             '/\[lock newsletter\]/i' => "",
             '/\[lock\]/i' => "",
 
+            // remove new style of shortcodes
+            '/<div.*?class=".*?">/is' => '',
+            '/<\/div>/is' => '',
+
             // remove iframes
             "/<iframe.*?\/iframe>/is" => "",
 
@@ -116,13 +116,13 @@ class NewsfilterGenerator implements IGenerator
             '/\[articlelink.*?id="?(\d+)"?.*?\]/is' => function ($matches) {
                 $url = "https://dennikn.sk/{$matches[1]}";
                 $meta = $this->content->fetchUrlMeta($url);
-                return 'Čítajte viac: <a href="' . $url . '" style="color:#181818;padding:0;margin:0;line-height:1.3;color:' . $this->linksColor . ';text-decoration:none;">' . $meta->getTitle() . '</a>';
+                return 'Čítajte viac: <a href="' . $url . '" style="color:#181818;padding:0;margin:0;line-height:1.3;color:' . $this->linksColor . ';text-decoration:underline;">' . $meta->getTitle() . '</a>';
             },
 
             // replace hrefs
-            '/<a.*?href="(.*?)".*?>(.*?)<\/a>/is' => '<a href="$1" style="color:#181818;padding:0;margin:0;Margin:0;line-height:1.3;color:' . $this->linksColor . ';text-decoration:none;">$2</a>',
+            '/<a.*?href="(.*?)".*?>(.*?)<\/a>/is' => '<a href="$1" style="color:#181818;padding:0;margin:0;Margin:0;line-height:1.3;color:' . $this->linksColor . ';text-decoration:underline;">$2</a>',
 
-            '/<h2.*?>\*<\/h2>/im' => '<div style="color:#181818;padding:0;margin:0;Margin:0;line-height:1.3;font-weight:bold;text-align:center;margin-bottom:30px;Margin-bottom:30px;font-size:24px;">*</div>',
+            '/<h2.*?>.*?\*.*?<\/h2>/im' => '<div style="color:#181818;padding:0;margin:0;Margin:0;line-height:1.3;font-weight:bold;text-align:center;margin-bottom:30px;Margin-bottom:30px;font-size:24px;">*</div>',
 
             // replace h2
             '/<h2.*?>(.*?)<\/h2>/is' => '<h2 style="color:#181818;padding:0;margin:0;Margin:0;line-height:1.3;font-weight:bold;text-align:left;margin-bottom:30px;Margin-bottom:30px;font-size:24px;">$1</h2>' . PHP_EOL,
@@ -149,7 +149,7 @@ class NewsfilterGenerator implements IGenerator
             // remove br from inside of a
             '/<a.*?\/a>/is' => function ($matches) {
                 return str_replace('<br />', '', $matches[0]);
-            }
+            },
         ];
 
         foreach ($rules as $rule => $replace) {
@@ -235,7 +235,7 @@ class NewsfilterGenerator implements IGenerator
 
         $form->addTextArea('summary', 'Summary')
             ->setAttribute('rows', 3)
-            ->setRequired("Field 'Summary' is required.");
+            ->setRequired(false);
 
         $form->addTextArea('newsfilter_html', 'HTML')
             ->setAttribute('rows', 20)
@@ -340,9 +340,9 @@ HTML;
 HTML;
 
         $hrTemplate = <<< HTML
-    <table cellspacing="0" cellpadding="0" border="0" width="100%" style="border-spacing:0;border-collapse:collapse;vertical-align:top;color:#181818;padding:0;margin:0;Margin:0;line-height:1.3;text-align:left;font-family:'Helvetica Neue', Helvetica, Arial;width:100%;">
-        <tr style="padding:0;vertical-align:top;text-align:left;">
-            <td style="padding:0;vertical-align:top;text-align:left;font-size:18px;line-height:1.6;border-collapse:collapse !important; padding: 30px 0 0 0; border-top:1px solid #E2E2E2;"></td>
+    <table cellspacing="0" cellpadding="0" border="0" width="100%" style="border-spacing:0;border-collapse:collapse;vertical-align:top;color:#181818;padding:0;margin:0;Margin:0;line-height:1.3;text-align:left;font-family:'Helvetica Neue', Helvetica, Arial;width:100%;min-width:100%;">
+        <tr style="padding:0;vertical-align:top;text-align:left;width:100%;min-width:100%;">
+            <td style="padding:0;vertical-align:top;text-align:left;font-size:18px;line-height:1.6;border-collapse:collapse !important; padding: 30px 0 0 0; border-top:1px solid #E2E2E2;height:0;line-height: 0;width:100%;min-width:100%;">&#xA0;</td>
         </tr>
     </table>
 

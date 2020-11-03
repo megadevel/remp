@@ -2,7 +2,7 @@
 
 namespace Remp\MailerModule\Commands;
 
-use League\Event\Emitter;
+use League\Event\EventDispatcher;
 use Nette\DI\Container;
 use Nette\Mail\SmtpException;
 use Nette\Utils\DateTime;
@@ -21,6 +21,9 @@ use Symfony\Component\Console\Command\Command;
 use Symfony\Component\Console\Input\InputInterface;
 use Symfony\Component\Console\Input\InputOption;
 use Symfony\Component\Console\Output\OutputInterface;
+use Tomaj\Hermes\Restart\RestartInterface;
+use Tracy\Debugger;
+use Tracy\ILogger;
 
 class MailWorkerCommand extends Command
 {
@@ -42,7 +45,7 @@ class MailWorkerCommand extends Command
 
     private $mailCache;
 
-    private $emitter;
+    private $eventDispatcher;
 
     private $isFirstLine = true;
 
@@ -51,6 +54,12 @@ class MailWorkerCommand extends Command
     private $container;
 
     private $logger;
+
+    /** @var RestartInterface */
+    private $restart;
+
+    /** @var \DateTime */
+    private $startTime;
 
     public function __construct(
         LoggerInterface $logger,
@@ -62,7 +71,7 @@ class MailWorkerCommand extends Command
         TemplatesRepository $mailTemplatesRepository,
         BatchTemplatesRepository $batchTemplatesRepository,
         MailCache $redis,
-        Emitter $emitter,
+        EventDispatcher $eventDispatcher,
         Container $container
     ) {
         parent::__construct();
@@ -74,9 +83,17 @@ class MailWorkerCommand extends Command
         $this->mailTemplateRepository = $mailTemplatesRepository;
         $this->batchTemplatesRepository = $batchTemplatesRepository;
         $this->mailCache = $redis;
-        $this->emitter = $emitter;
+        $this->eventDispatcher = $eventDispatcher;
         $this->container = $container;
         $this->logger = $logger;
+    }
+
+    /**
+     * Set implementation of RestartInterface which should handle graceful shutdowns.
+     */
+    public function setRestartInterface(RestartInterface $restart): void
+    {
+        $this->restart = $restart;
     }
 
     /**
@@ -97,6 +114,9 @@ class MailWorkerCommand extends Command
 
     protected function execute(InputInterface $input, OutputInterface $output)
     {
+        // store when command was started
+        $this->startTime = new \DateTime();
+
         $sendAsBatch = $input->getOption('batch');
 
         $output->writeln('');
@@ -106,6 +126,15 @@ class MailWorkerCommand extends Command
         $output->write('Checking mail queues');
 
         while (true) {
+            // graceful shutdown check
+            if ($this->restart && $this->restart->shouldRestart($this->startTime)) {
+                $now = (new \DateTime())->format(DATE_RFC3339);
+                $msg = "Exiting mail worker: restart instruction received '{$now}'.";
+                $output->write("\n<comment>{$msg}</comment>\n");
+                $this->logger->info($msg);
+                exit;
+            }
+
             $batch = $this->mailJobBatchRepository->getBatchToSend();
             if (!$batch) {
                 sleep(30);
@@ -230,13 +259,14 @@ class MailWorkerCommand extends Command
 
                         foreach ($jobs as $i => $job) {
                             $this->mailJobQueueRepository->delete($queueJobs[$i]);
-                            $this->emitter->emit(new MailSentEvent($job->userId, $job->email, $job->templateCode, $batch->id, time()));
+                            $this->eventDispatcher->dispatch(new MailSentEvent($job->userId, $job->email, $job->templateCode, $batch->id, time()));
                         }
 
                         $this->smtpErrors = 0;
                     } catch (SmtpException | Sender\MailerBatchException | \Exception $exception) {
                         $this->smtpErrors++;
                         $output->writeln("<error>Sending error: {$exception->getMessage()}</error>");
+                        Debugger::log($exception, ILogger::WARNING);
 
                         $this->logger->warning("Unable to send an email: " . $exception->getMessage(), [
                             'batch' => $sendAsBatch && $email->supportsBatch(),

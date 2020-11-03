@@ -17,7 +17,7 @@ remplib = typeof(remplib) === 'undefined' ? {} : remplib;
         social: null,
 
         campaign_id: null,
-
+ 
         _: [],
 
         article: {
@@ -86,7 +86,7 @@ remplib = typeof(remplib) === 'undefined' ? {} : remplib;
                 remplib.userSubscribed = config.userSubscribed;
             }
             if (typeof config.browserId !== 'undefined' && config.browserId !== null) {
-                remplib.browserId = config.browser;
+                remplib.browserId = config.browserId;
             }
 
             if (typeof config.article === 'object') {
@@ -290,7 +290,7 @@ remplib = typeof(remplib) === 'undefined' ? {} : remplib;
 
             for (let f of Object.keys(flags[ruleId])) {
                 // duplicating flag handling from track/pageviews API call
-                if (f === '_article') {
+                if (f === 'is_article') {
                     if (flags[ruleId][f] === '1' && !remplib.tracker.article) {
                         return false;
                     }
@@ -654,6 +654,9 @@ remplib = typeof(remplib) === 'undefined' ? {} : remplib;
 
         parseUriParams: function() {
             var query = window.location.search.substring(1);
+            
+            if (!query) return;
+            
             var vars = query.split('&');
 
             const now = new Date();

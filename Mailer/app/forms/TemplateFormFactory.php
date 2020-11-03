@@ -84,6 +84,12 @@ class TemplateFormFactory implements IFormFactory
         $form->addText('subject', 'Subject')
             ->setRequired("Field 'Subject' is required.");
 
+        $form->addSelect('click_tracking', 'Click tracking', [
+            null => 'Default mailer settings (depends on your provider configuration)',
+            1 => "Enabled",
+            0 => "Disabled",
+        ]);
+
         $form->addTextArea('mail_body_text', 'Text version')
             ->setAttribute('rows', 3);
 
@@ -115,6 +121,11 @@ class TemplateFormFactory implements IFormFactory
             $buttonSubmitted = self::FORM_ACTION_SAVE_CLOSE;
         }
 
+        if ($values['click_tracking'] === "") {
+            // handle null (default) selection
+            $values['click_tracking'] = null;
+        }
+
         try {
             if (!empty($values['id'])) {
                 $row = $this->templatesRepository->find($values['id']);
@@ -130,7 +141,8 @@ class TemplateFormFactory implements IFormFactory
                     $values['mail_body_text'],
                     $values['mail_body_html'],
                     $values['mail_layout_id'],
-                    $values['mail_type_id']
+                    $values['mail_type_id'],
+                    $values['click_tracking']
                 );
                 ($this->onCreate)($row, $buttonSubmitted);
             }

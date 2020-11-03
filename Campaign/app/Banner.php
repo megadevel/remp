@@ -7,8 +7,10 @@ use Illuminate\Notifications\Notifiable;
 use Illuminate\Support\Facades\Redis;
 use Predis\ClientInterface;
 use Ramsey\Uuid\Uuid;
+use Spatie\Searchable\Searchable;
+use Spatie\Searchable\SearchResult;
 
-class Banner extends Model
+class Banner extends Model implements Searchable
 {
     use Notifiable;
 
@@ -21,6 +23,7 @@ class Banner extends Model
     const TEMPLATE_BAR = 'bar';
     const TEMPLATE_COLLAPSIBLE_BAR = 'collapsible_bar';
     const TEMPLATE_SHORT_MESSAGE = 'short_message';
+    const TEMPLATE_OVERLAY_TWO_BUTTONS_SIGNATURE = 'overlay_two_buttons_signature';
 
     protected $fillable = [
         'name',
@@ -39,16 +42,22 @@ class Banner extends Model
         'js',
         'js_includes',
         'css_includes',
+        'manual_events_tracking',
     ];
 
     protected $casts = [
         'closeable' => 'boolean',
+        'manual_events_tracking' => 'boolean',
         'js_includes' => 'array',
         'css_includes' => 'array',
     ];
 
     protected $dateFormat = 'Y-m-d H:i:s';
 
+    public function getSearchResult(): SearchResult
+    {
+        return new SearchResult($this, $this->name);
+    }
 
     protected static function boot()
     {
@@ -132,6 +141,11 @@ class Banner extends Model
         return $this->hasOne(HtmlOverlayTemplate::class);
     }
 
+    public function overlayTwoButtonsSignatureTemplate()
+    {
+        return $this->hasOne(OverlayTwoButtonsSignatureTemplate::class);
+    }
+
     public function barTemplate()
     {
         return $this->hasOne(BarTemplate::class);
@@ -170,6 +184,8 @@ class Banner extends Model
                 return 'overlayRectangleTemplate';
             case self::TEMPLATE_HTML_OVERLAY:
                 return 'htmlOverlayTemplate';
+            case self::TEMPLATE_OVERLAY_TWO_BUTTONS_SIGNATURE:
+                return 'overlayTwoButtonsSignatureTemplate';
             default:
                 throw new \Exception('Unhandled banner template access: ' . $this->template);
         }

@@ -20,6 +20,9 @@ services:
         class: Remp\MailerModule\Hermes\UnsubscribeDroppedHandler
         setup:
             - setThreshold(3) # number of dropped emails before unsubscribing user
+
+    # restart hermes and mail worker with file (checks modification date; see SharedFileRestart implementation)
+    hermesRestart: Tomaj\Hermes\Restart\SharedFileRestart('/tmp/hermes_restart')
     hermesWorker:
         setup:
             - add('email-dropped', @unsubscribeDroppedHandler)
@@ -49,10 +52,10 @@ services:
 #            - register(Remp\MailerModule\Segment\Pythia(%remp.pythia.segments_addr%))
 
 #    - Remp\MailerModule\Tracker\Remp(%remp.beam.tracker_addr%, %remp.beam.tracker_property_token%)
-#    eventEmitter:
-#        class: League\Event\Emitter
+#    eventDispatcher:
+#        class: League\Event\EventDispatcher
 #        setup:
-#            - addListener(Remp\MailerModule\Events\MailSentEvent, Remp\MailerModule\Events\MailSentHandler())
+#            - subscribeTo(Remp\MailerModule\Events\MailSentEvent, Remp\MailerModule\Events\MailSentEventHandler())
 
     # If you're using Beam and want to use ProcessConversionStatsCommand, enable this repository (it's a dependency)
 #    - Remp\MailerModule\Repository\BeamConversionsRepository
@@ -66,3 +69,10 @@ local_configs:
     remp_mailermodule_mailer_smtpmailer_username: ''
     remp_mailermodule_mailer_smtpmailer_password: ''
     remp_mailermodule_mailer_smtpmailer_secure: ''
+
+
+# If running Mailer on Valet, please uncomment the following lines and adjust the full path to REMP/Mailer folder
+
+#webpack:
+#    build:
+#        directory: /FULL_PATH_TO_REMP_FOLDER/Mailer/www/assets/vendor

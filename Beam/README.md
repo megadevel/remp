@@ -48,13 +48,13 @@ php artisan db:seed
 After clean installation Beam Admin and Segments API would throw errors because the underlying database wouldn't have inidices for tracked events created. Docker installation handles this for you, but if you use manual installation, please run the following set of commands against your Elasticsearch instance.
 
 ```bash
-curl -XPUT -H "Content-Type: application/json" elasticsearch:9200/commerce -d '{"mappings": {"_doc": {"properties": {"revenue": {"type": "double"}}}}}'
-curl -XPUT -H "Content-Type: application/json" elasticsearch:9200/events -d '{"mappings": {"_doc": {}}}'
-curl -XPUT -H "Content-Type: application/json" elasticsearch:9200/pageviews -d '{"mappings": {"_doc": {}}}'
-curl -XPUT -H "Content-Type: application/json" elasticsearch:9200/pageviews_time_spent -d '{"mappings": {"_doc": {}}}'
-curl -XPUT -H "Content-Type: application/json" elasticsearch:9200/pageviews_progress -d '{"mappings": {"_doc": {}}}'
-curl -XPUT -H "Content-Type: application/json" elasticsearch:9200/concurrents_by_browser -d '{"mappings": {"_doc": {}}}'
-curl -XPUT -H "Content-Type: application/json" elasticsearch:9200/entities -d '{"mappings": {"_doc": {}}}'
+curl -XPUT -H "Content-Type: application/json" elasticsearch:9200/commerce -d '{"mappings": {"properties": {"revenue": {"type": "double"}}}}'
+curl -XPUT -H "Content-Type: application/json" elasticsearch:9200/events -d '{"mappings": {}}'
+curl -XPUT -H "Content-Type: application/json" elasticsearch:9200/pageviews -d '{"mappings": {}}'
+curl -XPUT -H "Content-Type: application/json" elasticsearch:9200/pageviews_time_spent -d '{"mappings": {}}'
+curl -XPUT -H "Content-Type: application/json" elasticsearch:9200/pageviews_progress -d '{"mappings": {}}'
+curl -XPUT -H "Content-Type: application/json" elasticsearch:9200/concurrents_by_browser -d '{"mappings": {}}'
+curl -XPUT -H "Content-Type: application/json" elasticsearch:9200/entities -d '{"mappings": {}}'
 ```
 
 *These commands need to be run just once. Every further execution would result in BadRequest returned by Elasticsearch that inidices or document types are already present.*
@@ -311,7 +311,7 @@ the error further.
 
 ---
 
-##### POST `/api/articles/upsert`
+##### POST `/api/articles/upsert` ([DEPRECATED - click here for v2](#post-apiv2articlesupsert))
 
 Your CMS should track all article-related changes to Beam so Beam knows about the article, who's the author and to which
 sections it belongs to. Once the article data is available to Beam, system starts to link various statistics that
@@ -340,6 +340,7 @@ data related to Beam (e.g. A/B testing of titles).
                 "B": "10 things everyone hides from you" // Title of variant being tracked with key "B"
             },
             "url": "http://example.com/74565321", // Public and valid URL of the article,
+            "content_type": "blog", // String; Optional; Content type of the article. Default value "article" used if not provided.
             "authors": [ // Optional
                 "Jon Snow" // Name of the author
             ],
@@ -373,12 +374,16 @@ curl -X POST \
                 "A": "10 things you need to know",
                 "B": "10 things everyone hides from you" 
             },
-            "url": "http://example.com/74565321", 
+            "url": "http://example.com/74565321",
+            "content_type": "blog", 
             "authors": [ 
                 "Jon Snow" 
             ],
             "sections": [
                 "Opinions" 
+            ],
+            "tags": [
+                "Elections 2020" 
             ],
             "published_at": "2018-06-05T06:03:05Z"
         }  
@@ -403,11 +408,15 @@ $payload = [
                 "B" => "10 things everyone hides from you"
             ],
             "url" => "http://example.com/74565321",
+            "content_type" => "blog",
             "authors" => [
                 "Jon Snow"
             ],
             "sections" => [
                 "Opinions"
+            ],
+            "tags" => [
+                "Elections 2020"
             ],
             "published_at" => "2018-06-05T06:03:05Z",
         ]
@@ -442,6 +451,7 @@ $response = file_get_contents("http://beam.remp.press/api/articles/upsert ", fal
             "property_uuid": "1a8feb16-3e30-4f9b-bf74-20037ea8505a",
             "title": "10 things you need to know",
             "url": "http://example.com/74565321",
+            "content_type": "blog",
             "image_url": null,
             "published_at": "2018-06-05 06:03:05",
             "pageviews_all": 0,
@@ -465,7 +475,14 @@ $response = file_get_contents("http://beam.remp.press/api/articles/upsert ", fal
                     "created_at": "2019-05-17 11:43:04",
                     "updated_at": "2019-05-17 11:43:04"
                 }
-            ]
+            ],
+            "tags": [
+                {
+                    "name": "Elections 2020",
+                    "created_at": "2019-05-17 11:43:04",
+                    "updated_at": "2019-05-17 11:43:04"
+                }
+            ],            
         }
     ]
 }
@@ -473,6 +490,217 @@ $response = file_get_contents("http://beam.remp.press/api/articles/upsert ", fal
 
 Any create/update matching is based on the article's `external_id`. You're free to update the article as many times
 as you want.
+
+---
+
+##### POST `/api/v2/articles/upsert`
+
+Your CMS should track all article-related changes to Beam so Beam knows about the article, who's the author and to which sections it belongs to. Once the article data is available to Beam, system starts to link various statistics that you've tracked with your JS snippet for given article (e.g. pageviews, time spent, reading progress) and data related to Beam (e.g. A/B testing of titles).
+
+##### *Headers:*
+
+| Name | Value | Required | Description |
+| --- |---| --- | --- |
+| Authorization | Bearer *String* | yes | API token. |
+| Content-Type | application/json | yes |  |
+| Accept | application/json | yes |  |
+
+##### *Body:*
+
+```json5
+{
+    "articles": [
+        {
+            "external_id": "74565321", // String; Required; ID of article in your CMS,
+            "property_uuid": "7855a8d9-d445-4dc0-8414-dbd7dfd326f9", // String; Required; Beam property token, you can get it in Beam admin - Properties,
+            "title": "10 things you need to know", // String; Required; Primary title of the article,
+            "titles": { // Optional; If A/B test of titles is used, you can track the titles here
+                "A": "10 things you need to know", // Title of variant being tracked with key "A"
+                "B": "10 things everyone hides from you" // Title of variant being tracked with key "B"
+            },
+            "url": "http://example.com/74565321", // Public and valid URL of the article,
+            "content_type": "blog", // String; Optional; Content type of the article. Default value "article" used if not provided.
+            "authors": [ // Optional
+                {
+                    "external_id": "1", // String; Required; External id of the author
+                    "name": "Jon Snow" // String; Required; Name of the author
+                }
+            ],
+            "sections": [ // Optional
+                {
+                    "external_id": "1", // String; Required; External id of the section
+                    "name": "Opinions" // String; Required; Name of the section
+                }
+            ],
+            "tags": [ // Optional
+                {
+                    "external_id": "1", // String; Required; External id of the tag
+                    "name": "Elections 2020" // String; Required; Name of the tag
+                }
+            ],
+            "published_at": "2018-06-05T06:03:05Z" // RFC3339 formatted datetime
+        }  
+    ]
+}
+```
+
+##### *Examples:*
+
+<details>
+<summary>curl</summary>
+
+```shell
+curl -X POST \
+  http://beam.remp.press/api/v2/articles/upsert \
+  -H 'Accept: application/json' \
+  -H 'Authorization: Bearer XXX' \
+  -H 'Content-Type: application/json' \
+  -d '{
+    "articles": [
+        {
+            "external_id": "74565321",
+            "property_uuid": "1a8feb16-3e30-4f9b-bf74-20037ea8505a", 
+            "title": "10 things you need to know",
+            "titles": {
+                "A": "10 things you need to know",
+                "B": "10 things everyone hides from you" 
+            },
+            "url": "http://example.com/74565321",
+            "content_type": "blog",
+            "authors": [
+                {
+                    "external_id": "1",
+                    "name": "Jon Snow"
+                }
+            ],
+            "sections": [
+                {
+                    "external_id": "1",
+                    "name": "Opinions"
+                }
+            ],
+            "tags": [
+                {
+                    "external_id": "1",
+                    "name": "Elections 2020" 
+                }
+            ],
+            "published_at": "2018-06-05T06:03:05Z"
+        }  
+    ]
+}'
+```
+
+</details>
+
+<details>
+<summary>raw PHP</summary>
+
+```php
+$payload = [
+    "articles" => [
+        [
+            "external_id" => "74565321",
+            "property_uuid" => "1a8feb16-3e30-4f9b-bf74-20037ea8505a",
+            "title" => "10 things you need to know",
+            "titles" => [
+                "A" => "10 things you need to know",
+                "B" => "10 things everyone hides from you"
+            ],
+            "url" => "http://example.com/74565321",
+            "content_type" => "blog",
+            "authors" => [
+                [
+                    "external_id" => "1",
+                    "name" => "Jon Snow"
+                ]
+            ],
+            "sections" => [
+                [
+                    "external_id" => "1",
+                    "name" => "Opinions"
+                ]
+            ],
+            "tags" => [
+                [
+                    "external_id" => "1",
+                    "name" => "Elections 2020" 
+                ]
+            ],
+            "published_at" => "2018-06-05T06:03:05Z",
+        ]
+    ]
+];
+$jsonPayload = json_encode($payload);
+$context = stream_context_create([
+        'http' => [
+            'method' => 'POST',
+            'header' => "Content-Type: type=application/json\r\n"
+                . "Accept: application/json\r\n"
+                . "Content-Length: " . strlen($jsonPayload) . "\r\n"
+                . "Authorization: Bearer XXX",
+            'content' => $jsonPayload,
+        ]
+    ]
+);
+$response = file_get_contents("http://beam.remp.press/api/v2/articles/upsert ", false, $context);
+// process response (raw JSON string)
+```
+
+</details>
+
+##### *Response:*
+
+```json5
+{
+    "data": [
+        {
+            "id": 123902,
+            "external_id": "74565321",
+            "property_uuid": "1a8feb16-3e30-4f9b-bf74-20037ea8505a",
+            "title": "10 things you need to know",
+            "url": "http://example.com/74565321",
+            "content_type": "blog",
+            "image_url": null,
+            "published_at": "2018-06-05 06:03:05",
+            "pageviews_all": 0,
+            "pageviews_signed_in": 0,
+            "pageviews_subscribers": 0,
+            "timespent_all": 0,
+            "timespent_signed_in": 0,
+            "timespent_subscribers": 0,
+            "created_at": "2019-05-17 11:43:04",
+            "updated_at": "2019-05-17 11:43:04",
+            "authors": [
+                {
+                    "external_id": "1",
+                    "name": "Jon Snow",
+                    "created_at": "2019-05-17 11:43:04",
+                    "updated_at": "2019-05-17 11:43:04"
+                }
+            ],
+            "sections": [
+                {
+                    "external_id": "1",
+                    "name": "Opinions",
+                    "created_at": "2019-05-17 11:43:04",
+                    "updated_at": "2019-05-17 11:43:04"
+                }
+            ],
+            "tags": [
+                {
+                    "external_id": "1",
+                    "name": "Elections 2020",
+                    "created_at": "2019-05-17 11:43:04",
+                    "updated_at": "2019-05-17 11:43:04"
+                }
+            ],            
+        }
+    ]
+}
+```
+
+Any create/update matching is based on the article's `external_id`. You're free to update the article as many times as you want.
 
 ---
 
@@ -587,6 +815,293 @@ $response = file_get_contents("http://beam.remp.press/api/conversions/upsert ", 
         }
     ]
 }
+```
+
+---
+
+##### POST `api/articles/top`
+
+Beam admin provides statistics about article performance. This endpoint return top articles by pageviews.
+You can filter articles by section and time of pageview.
+
+##### *Headers:*
+
+| Name | Value | Required | Description |
+| --- |---| --- | --- |
+| Authorization | Bearer *String* | yes | API token. |
+| Content-Type | application/json | yes |  |
+| Accept | application/json | yes |  |
+
+##### *Body:*
+
+```json5
+{
+	"from": "2020-08-10T08:09:18+00:00", // RFC3339-based start time from which to take pageviews to this today 
+	"limit": 3, // limit how many top articles this endpoint returns
+	"content_type": "article", // String; OPTIONAL; filters articles by content_type
+	"sections": { // OPTIONAL; filters from which sections take articles (use either external_id or name arrays, not both)
+		"external_id": ["Section external id"], // String; section external IDs 
+		"name": ["Section title"] // String; section external_id
+	}
+}
+```
+
+##### *Examples*:
+
+<details>
+<summary>curl</summary>
+
+```shell
+curl --location --request POST 'http://beam.remp.press/api/articles/top' \
+--header 'Content-Type: application/json' \
+--header 'Accept: application/json' \
+--header 'Authorization: Bearer XXX' \
+--data-raw '{
+	"from": "2020-08-10T08:09:18+00:00",
+	"limit": 3,
+	"content_type": "article",
+	"sections": {
+		"external_id": ["1"]
+	}
+}'
+```
+
+</details>
+
+<details>
+<summary>raw PHP</summary>
+
+```php
+$payload = [
+	"from" => "2020-08-10T08:09:18+00:00",
+	"limit" => 3,
+	"content_type" => "article",
+	"sections" => [
+		"Blog"
+	]
+];
+$jsonPayload = json_encode($payload);
+$context = stream_context_create([
+        'http' => [
+            'method' => 'POST',
+            'header' => "Content-Type: type=application/json\r\n"
+                . "Accept: application/json\r\n"
+                . "Content-Length: " . strlen($jsonPayload) . "\r\n"
+                . "Authorization: Bearer XXX",
+            'content' => $jsonPayload,
+        ]
+    ]
+);
+$response = file_get_contents("http://beam.remp.press/api/articles/top", false, $context);
+// process response (raw JSON string)
+```
+
+</details>
+
+##### *Response:*
+
+```json5
+[
+    {
+        "external_id": "1411843",
+        "pageviews": 274
+    },
+    {
+        "external_id": "1443988",
+        "pageviews": 150
+    },
+    {
+        "external_id": "1362607",
+        "pageviews": 45
+    }
+]
+```
+
+---
+
+##### POST `api/authors/top`
+
+Beam admin provides statistics about author performance. This endpoint return top authors by pageviews.
+You can filter authors by time of pageview.
+
+##### *Headers:*
+
+| Name | Value | Required | Description |
+| --- |---| --- | --- |
+| Authorization | Bearer *String* | yes | API token. |
+| Content-Type | application/json | yes |  |
+| Accept | application/json | yes |  |
+
+##### *Body:*
+
+```json5
+{
+	"from": "2020-08-10T08:14:09+00:00", // RFC3339-based start datetime from which to take pageviews to this today 
+	"limit": 3, // limit how many top authors this endpoint returns
+	"content_type": "article", // String; OPTIONAL; filters articles by content_type
+	"sections": { // OPTIONAL; filters from which sections take articles (use either external_id or name arrays, not both)
+		"external_id": ["Section external id"], // String; section external IDs 
+		"name": ["Section title"] // String; section external_id
+	}
+}
+```
+
+##### *Examples*:
+
+<details>
+<summary>curl</summary>
+
+```shell
+curl --location --request POST 'http://beam.remp.press/api/authors/top' \
+--header 'Content-Type: application/json' \
+--header 'Accept: application/json' \
+--header 'Authorization: Bearer XXX' \
+--data-raw '{
+	"from": "2020-08-10T08:14:09+00:00",
+	"limit": 3,
+	"content_type": "article",
+	"sections": {
+	    "external_id": ["22"]
+	}
+}'
+```
+
+</details>
+
+<details>
+<summary>raw PHP</summary>
+
+```php
+$payload = [
+	"from" => "2020-08-10T08:14:09+00:00",
+	"limit" => 3,
+	"content_type" => "article"
+];
+$jsonPayload = json_encode($payload);
+$context = stream_context_create([
+        'http' => [
+            'method' => 'POST',
+            'header' => "Content-Type: type=application/json\r\n"
+                . "Accept: application/json\r\n"
+                . "Content-Length: " . strlen($jsonPayload) . "\r\n"
+                . "Authorization: Bearer XXX",
+            'content' => $jsonPayload,
+        ]
+    ]
+);
+$response = file_get_contents("http://beam.remp.press/api/authors/top", false, $context);
+// process response (raw JSON string)
+```
+
+</details>
+
+##### *Response:*
+
+```json5
+[
+    {
+        "external_id": 100,
+        "name": "Example Author",
+        "pageviews": 23000
+    }
+]
+```
+
+---
+
+##### POST `api/tags/top`
+
+Beam admin provides statistics about tag performance. This endpoint return top post tags by pageviews.
+You can filter tags by time of pageview.
+
+##### *Headers:*
+
+| Name | Value | Required | Description |
+| --- |---| --- | --- |
+| Authorization | Bearer *String* | yes | API token. |
+| Content-Type | application/json | yes |  |
+| Accept | application/json | yes |  |
+
+##### *Body:*
+
+```json5
+{
+	"from": "2020-08-10T08:14:09+00:00", // RFC3339-based start datetime from which to take pageviews to this today 
+	"limit": 3, // limit how many top tags this endpoint returns
+	"content_type": "article", // String; OPTIONAL; filters articles by content_type
+	"sections": { // OPTIONAL; filters from which sections take articles (use either external_id or name arrays, not both)
+		"external_id": ["Section external id"], // String; section external IDs 
+		"name": ["Section title"] // String; section external_id
+	}
+}
+```
+
+##### *Examples*:
+
+<details>
+<summary>curl</summary>
+
+```shell
+curl --location --request POST 'http://beam.remp.press/api/tags/top' \
+--header 'Content-Type: application/json' \
+--header 'Accept: application/json' \
+--header 'Authorization: Bearer XXX' \
+--data-raw '{
+	"from": "2020-08-10T08:14:09+00:00",
+	"limit": 3,
+	"content_type": "article"
+}'
+```
+
+</details>
+
+<details>
+<summary>raw PHP</summary>
+
+```php
+$payload = [
+	"from" => "2020-08-10T08:14:09+00:00",
+	"limit" => 3,
+	"content_type" => "article"
+];
+$jsonPayload = json_encode($payload);
+$context = stream_context_create([
+        'http' => [
+            'method' => 'POST',
+            'header' => "Content-Type: type=application/json\r\n"
+                . "Accept: application/json\r\n"
+                . "Content-Length: " . strlen($jsonPayload) . "\r\n"
+                . "Authorization: Bearer XXX",
+            'content' => $jsonPayload,
+        ]
+    ]
+);
+$response = file_get_contents("http://beam.remp.press/api/tags/top", false, $context);
+// process response (raw JSON string)
+```
+
+</details>
+
+##### *Response:*
+
+```json5
+[
+    {
+        "name": "ekonomika",
+        "pageviews": 4000,
+        "external_id": "1"
+    },
+    {
+        "name": "covid19",
+        "pageviews": 3000,
+        "external_id": "2"
+    },
+    {
+        "name": "brexit",
+        "pageviews": 2000,
+        "external_id": "3"
+    }
+]
 ```
 
 ### Scheduled events
@@ -1156,3 +1671,23 @@ are met, Elasticsearch will create new index.
     
 Once configured and scheduled, rollovers will be happening automatically for you. When rollover happens, you need to
 create an alias for this rolled over index so also "reading" alias (e.g. `pageviews`) knows about it.
+
+## Healthcheck
+
+Route `http://beam.remp.press/health` provides health check for database, Redis, storage and logging.
+
+Returns:
+
+- **200 OK** and JSON with list of services _(with status "OK")_.
+- **500 Internal Server Error** and JSON with description of problem. E.g.:
+
+    ```
+    {
+      "status":"PROBLEM",
+      "log":{
+        "status":"PROBLEM",
+        "message":"Could not write to log file",
+        "context": // error or thrown exception...
+      //...
+    }
+    ```

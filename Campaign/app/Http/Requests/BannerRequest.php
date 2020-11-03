@@ -40,6 +40,7 @@ class BannerRequest extends FormRequest
             'offset_horizontal' => 'required|integer',
             'js_includes' => 'array',
             'css_includes' => 'array',
+            'manual_events_tracking' => 'boolean',
         ];
     }
 
@@ -64,8 +65,8 @@ class BannerRequest extends FormRequest
                         'button_background_color' => 'string|required',
                         'button_text_color' => 'string|required',
                         'header_text' => 'string|nullable',
-                        'main_text' => 'string|required',
-                        'button_text' => 'string|required',
+                        'main_text' => 'string|nullable',
+                        'button_text' => 'string|nullable',
                         'width' => 'string|nullable',
                         'height' => 'string|nullable',
                     ]);
@@ -78,11 +79,24 @@ class BannerRequest extends FormRequest
                         'button_background_color' => 'string|required',
                         'button_text_color' => 'string|required',
                         'header_text' => 'string|nullable',
-                        'main_text' => 'string|required',
-                        'button_text' => 'string|required',
+                        'main_text' => 'string|nullable',
+                        'button_text' => 'string|nullable',
                         'width' => 'string|nullable',
                         'height' => 'string|nullable',
                         'image_link' => 'string|nullable',
+                    ]);
+                    break;
+                case Banner::TEMPLATE_OVERLAY_TWO_BUTTONS_SIGNATURE:
+                    $templateValidator = Validator::make($this->all(), [
+                        'text_before' => 'string|nullable',
+                        'text_after' => 'string|nullable',
+                        'text_btn_primary' => 'string|required',
+                        'text_btn_primary_minor' => 'string|nullable',
+                        'text_btn_secondary' => 'string|nullable',
+                        'text_btn_secondary_minor' => 'string|nullable',
+                        'target_url_secondary' => 'string|nullable',
+                        'signature_image_url' => 'string|nullable',
+                        'text_signature' => 'string|nullable'
                     ]);
                     break;
                 case Banner::TEMPLATE_BAR:
@@ -91,8 +105,8 @@ class BannerRequest extends FormRequest
                         'text_color' => 'string|required',
                         'button_background_color' => 'string|required',
                         'button_text_color' => 'string|required',
-                        'main_text' => 'string|required',
-                        'button_text' => 'string|required',
+                        'main_text' => 'string|nullable',
+                        'button_text' => 'string|nullable',
                     ]);
                     break;
                 case Banner::TEMPLATE_COLLAPSIBLE_BAR:
@@ -101,11 +115,11 @@ class BannerRequest extends FormRequest
                         'text_color' => 'string|required',
                         'button_background_color' => 'string|required',
                         'button_text_color' => 'string|required',
-                        'header_text' => 'string|required',
-                        'collapse_text' => 'string|required',
-                        'expand_text' => 'string|required',
-                        'main_text' => 'string|required',
-                        'button_text' => 'string|required',
+                        'header_text' => 'string|nullable',
+                        'collapse_text' => 'string|nullable',
+                        'expand_text' => 'string|nullable',
+                        'main_text' => 'string|nullable',
+                        'button_text' => 'string|nullable',
                         'initial_state' => 'string|required',
                     ]);
                     break;
@@ -133,6 +147,9 @@ class BannerRequest extends FormRequest
     public function all($keys = null)
     {
         $result = parent::all($keys);
+        if (!isset($result['manual_events_tracking'])) {
+            $result['manual_events_tracking'] = false;
+        }
         if (!isset($result['closeable'])) {
             $result['closeable'] = false;
         }

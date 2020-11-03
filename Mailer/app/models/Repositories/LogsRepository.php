@@ -28,6 +28,11 @@ class LogsRepository extends Repository
         'suppress-unsubscribe' => 'hard_bounced_at',
     ];
 
+    public function allForEmail(string $email)
+    {
+        return $this->getTable()->where('email', $email);
+    }
+
     public function add($email, $subject, $templateId, $jobId = null, $batchId = null, $mailSenderId = null, $attachmentSize = null, $context = null)
     {
         return $this->insert(
@@ -182,11 +187,10 @@ class LogsRepository extends Repository
         return array_diff($emails, $alreadySentEmails);
     }
 
-    public function alreadySentContext($mailTemplateCode, $context)
+    public function alreadySentContext($context): bool
     {
         return $this->getTable()->where([
             'mail_logs.context' => $context,
-            'mail_template.code' => $mailTemplateCode
         ])->count('*') > 0;
     }
 

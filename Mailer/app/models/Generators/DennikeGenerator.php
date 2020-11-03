@@ -140,7 +140,11 @@ class DennikeGenerator implements IGenerator
             // remove br from inside of a
             '/<a.*?\/a>/is' => function ($matches) {
                 return str_replace('<br />', '', $matches[0]);
-            }
+            },
+
+            // remove new style of shortcodes
+            '/<div.*?class=".*?">/is' => '',
+            '/<\/div>/is' => '',
         ];
 
 
@@ -337,10 +341,10 @@ class DennikeGenerator implements IGenerator
             $result = json_decode($result);
             $thumbLink = $result->thumbnail_url;
 
-            return "<br><a href=\"{$link}\" target=\"_blank\" style=\"color:#181818;padding:0;margin:0;Margin:0;line-height:1.3;color:#1F3F83;text-decoration:none;\"><img src=\"{$thumbLink}\" alt=\"\" style=\"outline:none;text-decoration:none;-ms-interpolation-mode:bicubic;width:auto;max-width:100%;clear:both;display:block;margin-bottom:20px;\"></a><br><br>" . PHP_EOL;
+            return "<br><a href=\"{$link}\" target=\"_blank\" style=\"color:#181818;padding:0;margin:0;Margin:0;line-height:1.3;color:#1F3F83;text-decoration:underline;\"><img src=\"{$thumbLink}\" alt=\"\" style=\"outline:none;text-decoration:none;-ms-interpolation-mode:bicubic;width:auto;max-width:100%;clear:both;display:block;margin-bottom:20px;\"></a><br><br>" . PHP_EOL;
         }
 
-        return "<a href=\"{$link}\" target=\"_blank\" style=\"color:#181818;padding:0;margin:0;Margin:0;line-height:1.3;color:#1F3F83;text-decoration:none;\">$link</a><br><br>";
+        return "<a href=\"{$link}\" target=\"_blank\" style=\"color:#181818;padding:0;margin:0;Margin:0;line-height:1.3;color:#1F3F83;text-decoration:underline;\">$link</a><br><br>";
     }
 
     public function getTemplates()

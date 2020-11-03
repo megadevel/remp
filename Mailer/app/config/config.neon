@@ -3,12 +3,11 @@ parameters:
 	timezone: @environmentConfig::get('TIMEZONE')
 	sso_addr: @environmentConfig::get('SSO_ADDR')
 	sso_error_url: @environmentConfig::get('SSO_ERROR_URL')
+	max_result_count: @environmentConfig::get('SEARCH_MAX_RESULT_COUNT')
 	redis:
 		host: @environmentConfig::get('REDIS_HOST')
 		port: @environmentConfig::get('REDIS_PORT')
 		db: @environmentConfig::get('REDIS_DB')
-	hermes:
-		restart_file_path: @environmentConfig::get('HERMES_RESTART_FILE_PATH')
 	remp:
 		beam:
 			web_addr: @environmentConfig::get('REMP_BEAM_ADDR')
@@ -20,9 +19,13 @@ parameters:
 			segments_addr: @environmentConfig::get('REMP_PYTHIA_SEGMENTS_ADDR')
 		campaign:
 			web_addr: @environmentConfig::get('REMP_CAMPAIGN_ADDR')
-
-	errbit:
-		send_errors: false
+	preflight:
+		headers:
+			Access-Control-Allow-Headers:
+				- Authorization
+				- X-Requested-With
+				- Content-Type
+	template_editor: @environmentConfig::get('TEMPLATE_EDITOR')
 
 extensions:
 	local_configs: Remp\MailerModule\Config\ConfigExtension
@@ -56,7 +59,7 @@ database:
 			lazy: yes
 
 services:
-	router: Remp\RouterFactory::createRouter
+	router: Remp\Router\RouterFactory::createRouter
 	environmentConfig:
 		class: Remp\MailerModule\EnvironmentConfig
 		setup:
@@ -64,6 +67,8 @@ services:
 			- linkService(campaign, %remp.campaign.web_addr%, trending-up)
 			- linkService(mailer, /, email)
 			- setParam(locale, %locale%)
+			- setParam(max_result_count, %max_result_count%)
+			- setParam(template_editor, %template_editor%)
 
 	# Latte filters
 	filterLoader:
@@ -75,11 +80,16 @@ services:
 		setup:
 			- addFilter(null, [@filterLoader, 'load'])
 
+	mailWorkerCommand:
+		class: Remp\MailerModule\Commands\MailWorkerCommand(@commandsLogger)
+		setup:
+			- setRestartInterface(@hermesRestart)
+
 	console:
 		class: Remp\MailerModule\Console\Application
 		setup:
 			- register(Remp\MailerModule\Commands\ProcessJobCommand())
-			- register(Remp\MailerModule\Commands\MailWorkerCommand(@commandsLogger))
+			- register(@mailWorkerCommand)
 			- register(Remp\MailerModule\Commands\DatabaseSeedCommand())
 			- register(Remp\MailerModule\Commands\DemoSeedCommand())
 			- register(Remp\MailerModule\Commands\ProcessJobStatsCommand())
@@ -104,7 +114,8 @@ services:
 	dateFormatterFactory:
 		class: Remp\MailerModule\Formatters\DateFormatterFactory(%locale%, %timezone%)
 
-	hermesRestart: Tomaj\Hermes\Restart\SharedFileRestart(%hermes.restart_file_path%)
+	# restart hermes and mail worker through hermes_restart key in redis (override in local config with second string argument if you want to change key)
+	hermesRestart: Tomaj\Hermes\Restart\RedisRestart(@redisCache::client())
 	hermesDispatcher:
 		class: Tomaj\Hermes\Dispatcher(Remp\MailerModule\Hermes\RedisDriver(), @hermesLogger, @hermesRestart)
 	hermesEmitter:
@@ -122,8 +133,8 @@ services:
 			- add('send-email', Remp\MailerModule\Hermes\SendEmailHandler())
 #			- add('mail-sent', Remp\MailerModule\Hermes\MailSentHandler())
 
-	eventEmitter:
-		class: League\Event\Emitter
+	eventDispatcher:
+		class: League\Event\EventDispatcher
 
 	segmentAgreggator:
 		class: Remp\MailerModule\Segment\Aggregator
@@ -169,14 +180,18 @@ services:
 	apiDecider:
 		class: Tomaj\NetteApi\ApiDecider
 		setup:
-			- enableGlobalPreflight()
+			- enableGlobalPreflight(Tomaj\NetteApi\Handlers\CorsPreflightHandler(Nette\Http\Response(), %preflight.headers%))
 			- addApiHandler(\Tomaj\NetteApi\EndpointIdentifier('POST', 1, 'users', 'subscribe'), \Remp\MailerModule\Api\v1\Handlers\Users\SubscribeHandler(), \Tomaj\NetteApi\Authorization\BearerTokenAuthorization())
 			- addApiHandler(\Tomaj\NetteApi\EndpointIdentifier('POST', 1, 'users', 'un-subscribe'), \Remp\MailerModule\Api\v1\Handlers\Users\UnSubscribeHandler(), \Tomaj\NetteApi\Authorization\BearerTokenAuthorization())
 			- addApiHandler(\Tomaj\NetteApi\EndpointIdentifier('POST', 1, 'users', 'bulk-subscribe'), \Remp\MailerModule\Api\v1\Handlers\Users\BulkSubscribeHandler(), \Tomaj\NetteApi\Authorization\BearerTokenAuthorization())
 			- addApiHandler(\Tomaj\NetteApi\EndpointIdentifier('POST', 1, 'users', 'check-token'), \Remp\MailerModule\Api\v1\Handlers\Users\CheckTokenHandler(), \Tomaj\NetteApi\Authorization\NoAuthorization())
 			- addApiHandler(\Tomaj\NetteApi\EndpointIdentifier('POST', 1, 'users', 'email-changed'), \Remp\MailerModule\Api\v1\Handlers\Users\EmailChangedHandler(), \Tomaj\NetteApi\Authorization\BearerTokenAuthorization())
+			- addApiHandler(\Tomaj\NetteApi\EndpointIdentifier('POST', 1, 'users', 'user-preferences'), \Remp\MailerModule\Api\v1\Handlers\Users\UserPreferencesHandler(), \Tomaj\NetteApi\Authorization\BearerTokenAuthorization())
 			- addApiHandler(\Tomaj\NetteApi\EndpointIdentifier('POST', 1, 'users', 'user-registered'), \Remp\MailerModule\Api\v1\Handlers\Users\UserRegisteredHandler(), \Tomaj\NetteApi\Authorization\BearerTokenAuthorization())
 			- addApiHandler(\Tomaj\NetteApi\EndpointIdentifier('POST', 1, 'users', 'bulk-user-registered'), \Remp\MailerModule\Api\v1\Handlers\Users\BulkUserRegisteredHandler(), \Tomaj\NetteApi\Authorization\BearerTokenAuthorization())
+			- addApiHandler(\Tomaj\NetteApi\EndpointIdentifier('POST', 1, 'users', 'is-unsubscribed'), \Remp\MailerModule\Api\v1\Handlers\Users\IsUnsubscribedHandler(), \Tomaj\NetteApi\Authorization\BearerTokenAuthorization())
+			- addApiHandler(\Tomaj\NetteApi\EndpointIdentifier('POST', 1, 'users', 'logs'), \Remp\MailerModule\Api\v1\Handlers\Users\LogsHandler(), \Tomaj\NetteApi\Authorization\NoAuthorization())
+			- addApiHandler(\Tomaj\NetteApi\EndpointIdentifier('POST', 1, 'users', 'logs-count-per-status'), \Remp\MailerModule\Api\v1\Handlers\Users\LogsCountPerStatusHandler(), \Tomaj\NetteApi\Authorization\NoAuthorization())
 			- addApiHandler(\Tomaj\NetteApi\EndpointIdentifier('POST', 1, 'mailers', 'mailgun'), \Remp\MailerModule\Api\v1\Handlers\Mailers\MailgunEventsHandler(), \Tomaj\NetteApi\Authorization\NoAuthorization())
 			- addApiHandler(\Tomaj\NetteApi\EndpointIdentifier('POST', 1, 'mailers', 'generate-mail'), \Remp\MailerModule\Api\v1\Handlers\Mailers\MailGeneratorHandler(), \Tomaj\NetteApi\Authorization\BearerTokenAuthorization())
 			- addApiHandler(\Tomaj\NetteApi\EndpointIdentifier('POST', 1, 'mailers', 'preprocess-generator-parameters'), \Remp\MailerModule\Api\v1\Handlers\Mailers\MailGeneratorPreprocessHandler(), \Tomaj\NetteApi\Authorization\BearerTokenAuthorization())
@@ -184,7 +199,9 @@ services:
 			- addApiHandler(\Tomaj\NetteApi\EndpointIdentifier('POST', 1, 'mailers', 'templates'), \Remp\MailerModule\Api\v1\Handlers\Mailers\MailCreateTemplateHandler(), \Tomaj\NetteApi\Authorization\BearerTokenAuthorization())
 			- addApiHandler(\Tomaj\NetteApi\EndpointIdentifier('POST', 1, 'mailers', 'jobs'), \Remp\MailerModule\Api\v1\Handlers\Mailers\MailJobCreateApiHandler(), \Tomaj\NetteApi\Authorization\BearerTokenAuthorization())
 			- addApiHandler(\Tomaj\NetteApi\EndpointIdentifier('GET', 1, 'mailers', 'mail-types'), \Remp\MailerModule\Api\v1\Handlers\Mailers\MailTypesListingHandler(), \Tomaj\NetteApi\Authorization\BearerTokenAuthorization())
+			- addApiHandler(\Tomaj\NetteApi\EndpointIdentifier('GET', 1, 'mailers', 'mail-type-categories'), \Remp\MailerModule\Api\v1\Handlers\Mailers\MailTypeCategoriesHandler(), \Tomaj\NetteApi\Authorization\BearerTokenAuthorization())
 			- addApiHandler(\Tomaj\NetteApi\EndpointIdentifier('POST', 1, 'mailers', 'mail-type-upsert'), \Remp\MailerModule\Api\v1\Handlers\Mailers\MailTypeUpsertHandler(), \Tomaj\NetteApi\Authorization\BearerTokenAuthorization())
+			- addApiHandler(\Tomaj\NetteApi\EndpointIdentifier('GET', 1, 'mailers', 'templates'), \Remp\MailerModule\Api\v1\Handlers\Mailers\MailTemplatesListingHandler(), \Tomaj\NetteApi\Authorization\BearerTokenAuthorization())
 			- addApiHandler(\Tomaj\NetteApi\EndpointIdentifier('GET', 1, 'segments', 'list'), \Remp\MailerModule\Api\v1\Handlers\Segments\SegmentsListingHandler(), \Tomaj\NetteApi\Authorization\BearerTokenAuthorization())
 			- addApiHandler(\Tomaj\NetteApi\EndpointIdentifier('POST', 2, 'mailers', 'mailgun'), \Remp\MailerModule\Api\v2\Handlers\Mailers\MailgunEventsHandler(), \Tomaj\NetteApi\Authorization\NoAuthorization())
 			- addApiHandler(\Tomaj\NetteApi\EndpointIdentifier('POST', 1, 'mailers', 'send-email'), \Remp\MailerModule\Api\v1\Handlers\Mailers\SendEmailHandler(), \Tomaj\NetteApi\Authorization\BearerTokenAuthorization())
@@ -266,3 +283,6 @@ services:
 		class: Remp\MailerModule\Generators\EmbedParser
 	articleLocker:
 		class: Remp\MailerModule\Generators\ArticleLocker
+
+	# healtCheck - inject temp for storage check
+	- Remp\MailerModule\Presenters\HealthPresenter(%tempDir%)

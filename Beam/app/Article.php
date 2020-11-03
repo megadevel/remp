@@ -5,22 +5,27 @@ namespace App;
 use App\Helpers\Journal\JournalHelpers;
 use App\Model\ArticleTitle;
 use App\Model\Config\ConversionRateConfig;
+use App\Model\Tag;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\DB;
 use Remp\Journal\AggregateRequest;
 use Remp\Journal\JournalContract;
+use Spatie\Searchable\Searchable;
+use Spatie\Searchable\SearchResult;
 use Yadakhov\InsertOnDuplicateKey;
 
-class Article extends Model
+class Article extends Model implements Searchable
 {
     use InsertOnDuplicateKey;
 
     private const DEFAULT_TITLE_VARIANT = 'default';
-    
+
     private const DEFAULT_IMAGE_VARIANT = 'default';
-    
+
+    public const DEFAULT_CONTENT_TYPE = 'article';
+
     private $journal;
 
     private $journalHelpers;
@@ -35,6 +40,7 @@ class Article extends Model
         'title',
         'author',
         'url',
+        'content_type',
         'section',
         'image_url',
         'published_at',
@@ -49,6 +55,11 @@ class Article extends Model
         'updated_at',
     ];
 
+    public function getSearchResult(): SearchResult
+    {
+        return new SearchResult($this, $this->title);
+    }
+
     public function property()
     {
         return $this->belongsTo(Property::class, 'property_uuid', 'uuid');
@@ -62,6 +73,11 @@ class Article extends Model
     public function sections()
     {
         return $this->belongsToMany(Section::class);
+    }
+
+    public function tags()
+    {
+        return $this->belongsToMany(Tag::class);
     }
 
     public function conversions()
