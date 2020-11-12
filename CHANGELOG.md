@@ -15,19 +15,24 @@ The format is based on [Keep a Changelog](http://keepachangelog.com/) and this p
 ### [Beam]
 
 - Added caching to Tracker preflight requests to limit number of OPTIONS calls. Cache is now set to 1 hour (3600 seconds) and it effectively adds `Access-Control-Max-Age: 3600` header to preflight responses.
+- Fixed issue with slow pageview processing queries due to string/int type conflict in the query parameters. remp/remp#766
 
 ### [Campaign]
 
 - Allowed search and paging in dashboard schedules table. remp/remp#755
+- Fixed possibility of banner close buttons being overlayed by Safari scrollbar. remp/remp#764
+- Extended banner close button area for easier manipulation on touch-based devices. remp/remp#764
 
 ### [Mailer]
 
 - **BREAKING** Updated [league/event](https://event.thephpleague.com/) from [version 2 to 3](https://event.thephpleague.com/3.0/upgrade-from-2-to-3/) - there is config change - please change `League\Event\Emitter` to `League\Event\EventDispatcher`
+- **BREAKING**: Removed `Remp\MailerModule\Console\Application` and keep only native Symfony Application. Change in config -> use `add` instead of `register`
 - Fixed possible issue with asset location on Mac when Valet is used for development.
 - Upgraded vlucas/phpdotenv from version 2 to 5 and removed usage of `getenv()` function.
 - Removed obsolete deploy script.
 - Fixed Hermes worker `RedisDriver` not restarting if there are no new tasks to handle. remp/crm#1561
 - Refactored bootstrap file to follow new Nette skeleton structure.
+- Added missing `user_id` index to `mail_user_subscriptions` table.
 
 ## [0.15.0] - 2020-10-15
 
@@ -430,6 +435,7 @@ _Note: Generated binaries were not changed since 0.7.0, there's no need to redep
 [Segments]: https://github.com/remp2020/remp/tree/master/Beam/go/cmd/segments
 [Tracker]: https://github.com/remp2020/remp/tree/master/Beam/go/cmd/tracker
 
+[0.15.0]: https://github.com/remp2020/remp/compare/0.14.0...0.15.0
 [0.14.0]: https://github.com/remp2020/remp/compare/0.13.0...0.14.0
 [0.13.0]: https://github.com/remp2020/remp/compare/0.12.0...0.13.0
 [0.12.0]: https://github.com/remp2020/remp/compare/0.11.1...0.12.0
