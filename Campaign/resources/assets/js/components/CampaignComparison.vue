@@ -94,8 +94,8 @@
 
 <script>
     import axios from 'axios'
-    import Loader from 'remp/js/components/Loader'
-    import vSelect from 'remp/js/components/vSelect.vue'
+    import Loader from '@remp/js-commons/js/components/Loader'
+    import vSelect from '@remp/js-commons/js/components/vSelect.vue'
 
     export default {
         components: {
@@ -161,7 +161,7 @@
             },
             loadDataAfter(axiosPromise) {
                 axiosPromise
-                    .then(() => axios.get(route('comparison.json').url()))
+                    .then(() => axios.get(route('comparison.json')))
                     .then(response => {
                         this.loading = false
                         this.campaigns = response.data.campaigns
@@ -182,19 +182,19 @@
                     return
                 }
                 this.loading = true
-                this.loadDataAfter(axios.put(route('comparison.remove', this.campaignToAdd).url()))
+                this.loadDataAfter(axios.put(route('comparison.remove', this.campaignToAdd)))
             },
             addAll() {
                 this.loading = true
-                this.loadDataAfter(axios.post(route('comparison.addAll').url()))
+                this.loadDataAfter(axios.post(route('comparison.addAll')))
             },
             remove(campaignId) {
                 this.loading = true
-                this.loadDataAfter(axios.delete(route('comparison.remove', campaignId).url()))
+                this.loadDataAfter(axios.delete(route('comparison.remove', campaignId)))
             },
             removeAll() {
                 this.loading = true
-                this.loadDataAfter(axios.post(route('comparison.removeAll').url()))
+                this.loadDataAfter(axios.post(route('comparison.removeAll')))
             }
         }
     }

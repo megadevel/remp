@@ -277,6 +277,14 @@ var Event = MediaType("application/vnd.event+json", func() {
 		Attribute("system", System)
 		Attribute("user", User)
 		Attribute("article_id", String)
+
+		// REMP's utm
+		Attribute("rtm_source", String)
+		Attribute("rtm_campaign", String)
+		Attribute("rtm_medium", String)
+		Attribute("rtm_content", String)
+
+		// Deprecated, will be removed (replaced with rtm_ parameters)
 		Attribute("utm_source", String)
 		Attribute("utm_campaign", String)
 		Attribute("utm_medium", String)
@@ -289,10 +297,18 @@ var Event = MediaType("application/vnd.event+json", func() {
 		Attribute("system")
 		Attribute("user")
 		Attribute("article_id", String)
-		Attribute("utm_source")
-		Attribute("utm_campaign")
-		Attribute("utm_medium")
-		Attribute("utm_content")
+
+		// REMP's utm
+		Attribute("rtm_source", String)
+		Attribute("rtm_campaign", String)
+		Attribute("rtm_medium", String)
+		Attribute("rtm_content", String)
+
+		// deprecated
+		Attribute("utm_source", String)
+		Attribute("utm_campaign", String)
+		Attribute("utm_medium", String)
+		Attribute("utm_content", String)
 	})
 	Required("id", "system", "category", "action")
 })
@@ -314,7 +330,7 @@ var CountHistogram = MediaType("application/vnd.count.histogram+json", func() {
 	Description("Count histogram data")
 	Attributes(func() {
 		Attribute("bucket_key", Number)
-		Attribute("value", Number)
+		Attribute("value", Integer)
 	})
 	View("default", func() {
 		Attribute("bucket_key")
@@ -335,7 +351,7 @@ var Commerce = MediaType("application/vnd.commerce+json", func() {
 		Attribute("purchase", CommercePayment)
 		Attribute("refund", CommercePayment)
 
-		Attribute("source", Source, "UTM source metadata")
+		Attribute("source", Source, "RTM source metadata")
 		Attribute("article", Article)
 		Attribute("system", System)
 		Attribute("user", User)
@@ -382,14 +398,20 @@ var User = MediaType("application/vnd.user+json", func() {
 		Attribute("url", String, "URL of the content/conversion point", func() {
 			Format("uri")
 		})
+		Attribute("canonical_url", String, "Canonical URL of the content/conversion point", func() {
+			Format("uri")
+		})
 		Attribute("user_agent", String, "User agent of client")
 		Attribute("ip_address", String, "IP address of client", func() {
 			Format("ip")
 		})
-		Attribute("source", Source, "UTM source metadata")
+		Attribute("source", Source, "RTM source metadata")
 		Attribute("remp_session_id", String, "ID of reader's session")
 		Attribute("remp_pageview_id", String, "ID of pageview")
 		Attribute("referer", String, "Value of HTTP referer header (if present)")
+		Attribute("derived_referer_medium", String, "Medium which trigerred the pageview (e.g. internal, search, ...)")
+		Attribute("derived_referer_source", String, "Specific source of medium which trigerred the pageview (e.g. Google, Gmail, ...)")
+		Attribute("derived_referer_host_with_path", String, "Referer without query parameters (only host and path)")
 		Attribute("timespent", Integer, "Number of seconds spent during pageview (if recorded)")
 	})
 	View("default", func() {
@@ -397,12 +419,16 @@ var User = MediaType("application/vnd.user+json", func() {
 		Attribute("subscriber")
 		Attribute("browser_id")
 		Attribute("url")
+		Attribute("canonical_url")
 		Attribute("user_agent")
 		Attribute("ip_address")
 		Attribute("source")
 		Attribute("remp_session_id")
 		Attribute("remp_pageview_id")
 		Attribute("referer")
+		Attribute("derived_referer_medium")
+		Attribute("derived_referer_source")
+		Attribute("derived_referer_host_with_path")
 		Attribute("timespent")
 	})
 	Required("remp_pageview_id")
@@ -426,6 +452,7 @@ var Article = MediaType("application/vnd.article+json", func() {
 		Attribute("category", String, "Page category (homepage, world news...")
 		Attribute("tags", ArrayOf(String), "List of tags (breaking news, trump...")
 		Attribute("author_id", String, "ID of author")
+		Attribute("content_type", String, "Type of the content, e.g. 'article'")
 		Attribute("locked", Boolean, "Flag whether content was locked for the visitor")
 		Attribute("variants", HashOf(String, String), "Hash of key-value pairs bearing A/B test variant information (what's A/B-tested / variant label)")
 	})
@@ -434,6 +461,7 @@ var Article = MediaType("application/vnd.article+json", func() {
 		Attribute("category")
 		Attribute("tags")
 		Attribute("author_id")
+		Attribute("content_type")
 		Attribute("locked")
 		Attribute("variants")
 	})
@@ -442,12 +470,24 @@ var Article = MediaType("application/vnd.article+json", func() {
 
 var Source = MediaType("application/vnd.source+json", func() {
 	Attributes(func() {
-		Attribute("utm_source", String, "Origin of user (e.g. remp_campaign)")
-		Attribute("utm_medium", String, "Medium through which the came (e.g. overlay, inline)")
-		Attribute("utm_campaign", String, "Reference to specific campaign (e.g. campaign ID")
-		Attribute("utm_content", String, "Reference to specific campaign mean (e.g. banner ID)")
+		Attribute("rtm_source", String, "Origin of user (e.g. remp_campaign)")
+		Attribute("rtm_medium", String, "Medium through which the came (e.g. overlay, inline)")
+		Attribute("rtm_campaign", String, "Reference to specific campaign (e.g. campaign ID")
+		Attribute("rtm_content", String, "Reference to specific campaign mean (e.g. banner ID)")
+
+		// Deprecated, will be removed
+		Attribute("utm_source", String, "[DEPRECATED] Origin of user (e.g. remp_campaign). Deprecated, please use rtm_source.")
+		Attribute("utm_medium", String, "[DEPRECATED] Medium through which the came (e.g. overlay, inline). Deprecated, please use rtm_medium.")
+		Attribute("utm_campaign", String, "[DEPRECATED] Reference to specific campaign (e.g. campaign ID). Deprecated, please use rtm_campaign.")
+		Attribute("utm_content", String, "[DEPRECATED] Reference to specific campaign mean (e.g. banner ID). Deprecated, please use rtm_content.")
 	})
 	View("default", func() {
+		Attribute("rtm_source")
+		Attribute("rtm_medium")
+		Attribute("rtm_campaign")
+		Attribute("rtm_content")
+
+		// deprecated
 		Attribute("utm_source")
 		Attribute("utm_medium")
 		Attribute("utm_campaign")

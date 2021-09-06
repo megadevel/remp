@@ -9,6 +9,7 @@ use Illuminate\Console\Scheduling\Schedule;
 use Illuminate\Foundation\Console\Kernel as ConsoleKernel;
 use Illuminate\Support\Carbon;
 use Schema;
+use Log;
 
 class Kernel extends ConsoleKernel
 {
@@ -30,16 +31,12 @@ class Kernel extends ConsoleKernel
      */
     protected function schedule(Schedule $schedule)
     {
-        if (!Schema::hasTable("migrations")) {
-            return;
-        }
-
         // Collect campaign stats if Beam Journal is configured
         $beamJournalConfigured = !empty(config('services.remp.beam.segments_addr'));
         if ($beamJournalConfigured) {
             $schedule->command(AggregateCampaignStats::COMMAND)
                 ->everyMinute()
-                ->withoutOverlapping()
+                ->withoutOverlapping(config('system.commands_overlapping_expires_at'))
                 ->appendOutputTo(storage_path('logs/aggregate_campaign_stats.log'));
         }
 
@@ -59,11 +56,11 @@ class Kernel extends ConsoleKernel
                 foreach ($campaign->segments as $campaignSegment) {
                     $schedule->job(new CacheSegmentJob($campaignSegment, true))
                         ->hourly()
-                        ->withoutOverlapping();
+                        ->withoutOverlapping(config('system.commands_overlapping_expires_at'));
 
                     $schedule->job(new CacheSegmentJob($campaignSegment, false))
                         ->everyMinute()
-                        ->withoutOverlapping();
+                        ->withoutOverlapping(config('system.commands_overlapping_expires_at'));
                 }
             }
         } catch (\PDOException $e) {

@@ -6,16 +6,14 @@ use App\Article;
 use App\Helpers\Journal\JournalHelpers;
 use App\Helpers\Colors;
 use App\Helpers\Journal\JournalInterval;
+use App\Http\Requests\ArticlesListRequest;
 use App\Http\Resources\ArticleResource;
-use App\Model\ArticleViewsSnapshot;
+use App\Model\ConversionSource;
 use App\Model\Snapshots\SnapshotHelpers;
 use Carbon\Carbon;
-use DB;
-use Illuminate\Database\Query\Builder;
 use Illuminate\Http\Request;
 use Remp\Journal\AggregateRequest;
 use Remp\Journal\JournalContract;
-use Remp\Journal\ListRequest;
 
 class ArticleDetailsController extends Controller
 {
@@ -55,7 +53,7 @@ class ArticleDetailsController extends Controller
             $request->addFilter('derived_referer_medium', 'internal');
         });
 
-        $data['colors'] = Colors::abTestVariantTagsToColors($data['tags']);
+        $data['colors'] = array_values(Colors::assignColorsToVariantTags($data['tags']));
 
         $tagToColor = [];
         for ($i = 0, $iMax = count($data['tags']); $i < $iMax; $i++) {
@@ -88,7 +86,7 @@ class ArticleDetailsController extends Controller
                 $text = null;
                 if ($newTitle->title === null) {
                     $text = "<b>{$variant} Title Variant Deleted</b><br /><strike>{$oldTitle->title}</strike>";
-                } else if ($oldTitle->title === null) {
+                } elseif ($oldTitle->title === null) {
                     $text = "<b>{$variant} Title Variant Added</b><br />{$newTitle->title}";
                 } else {
                     $text = "<b>{$variant} Title Variant Changed</b><br />" .
@@ -175,13 +173,13 @@ class ArticleDetailsController extends Controller
                 throw new \Exception("unknown pageviews data source {$this->pageviewGraphDataSource}");
         }
 
-        $data['colors'] = Colors::refererMediumTagsToColors($data['tags']);
+        $data['colors'] = array_values(Colors::assignColorsToMediumRefers($data['tags']));
         $data['events'] = [];
 
         $eventOptions = $request->get('events', []);
         if (in_array('conversions', $eventOptions, false)) {
             $conversions = $article->conversions()
-                ->whereBetween('paid_at', [$journalInterval->timeAfter->tz('UTC'), $journalInterval->timeBefore->tz('UTC')])
+                ->whereBetween('paid_at', [$journalInterval->timeAfter, $journalInterval->timeBefore])
                 ->get();
 
             foreach ($conversions as $conversion) {
@@ -219,7 +217,7 @@ class ArticleDetailsController extends Controller
                     $text = null;
                     if ($newTitle->title === null) {
                         $text = "<b>{$variantText} Deleted</b><br /><strike>{$oldTitle->title}</strike>";
-                    } else if ($oldTitle->title === null) {
+                    } elseif ($oldTitle->title === null) {
                         $text = "<b>{$variantText} Added</b><br />{$newTitle->title}";
                     } else {
                         $text = "<b>{$variantText} Changed</b><br />" .
@@ -259,7 +257,7 @@ class ArticleDetailsController extends Controller
             ];
         }
 
-        $colors = Colors::generalTagsToColors(array_keys($tags), true);
+        $colors = Colors::assignColorsToGeneralTags(array_keys($tags));
         foreach ($events as $event) {
             $eventItem->color = $colors[$event->title];
         }
@@ -279,7 +277,7 @@ class ArticleDetailsController extends Controller
         $journalRequest = (new AggregateRequest('pageviews', 'load'))
             ->addFilter('article_id', $article->external_id)
             ->setTime($journalInterval->timeAfter, $journalInterval->timeBefore)
-            ->setTimeHistogram($journalInterval->intervalText, '0h')
+            ->setTimeHistogram($journalInterval->intervalText)
             ->addGroup($groupBy);
 
         if ($addConditions) {
@@ -349,7 +347,22 @@ class ArticleDetailsController extends Controller
             }
         }
 
-        return redirect()->route('articles.show', ['id' => $article->id]);
+        return redirect()->route('articles.show', ['article' => $article->id]);
+    }
+
+    public function list(ArticlesListRequest $request)
+    {
+        $externalIds = $request->external_ids;
+        if (!empty($externalIds)) {
+            $articles = Article::whereIn('external_id', $externalIds)->get();
+        }
+
+        $ids = $request->ids;
+        if (!empty($ids)) {
+            $articles = Article::whereIn('id', $ids)->get();
+        }
+
+        return response()->json(['articles' => $articles]);
     }
 
     public function show(Request $request, Article $article = null)
@@ -407,7 +420,7 @@ class ArticleDetailsController extends Controller
                 'dataFrom' => $request->input('data_from', 'today - 30 days'),
                 'dataTo' => $request->input('data_to', 'now'),
                 'mediums' => $mediums,
-                'mediumColors' => Colors::refererMediumTagsToColors($mediums, true),
+                'mediumColors' => Colors::assignColorsToMediumRefers($mediums),
                 'visitedFrom' => $request->input('visited_from', 'today - 30 days'),
                 'visitedTo' => $request->input('visited_to', 'now'),
                 'snapshotsDataSource' => $this->pageviewGraphDataSource === 'snapshots',
@@ -424,8 +437,8 @@ class ArticleDetailsController extends Controller
         $orderOptions = $request->input('order');
         $draw = $request->input('draw');
 
-        $visitedTo = Carbon::parse($request->input('visited_to'), $request->input('tz'))->tz('UTC');
-        $visitedFrom = Carbon::parse($request->input('visited_from'), $request->input('tz'))->tz('UTC');
+        $visitedTo = Carbon::parse($request->input('visited_to'), $request->input('tz'));
+        $visitedFrom = Carbon::parse($request->input('visited_from'), $request->input('tz'));
 
         $ar = (new AggregateRequest('pageviews', 'load'))
             ->setTime($visitedFrom, $visitedTo)
@@ -466,12 +479,54 @@ class ArticleDetailsController extends Controller
             $aggregated[$derivedMedium][$key] += $count;
         }
 
+        // retrieve conversion sources and group their counts by type(first/last), url and medium as well (same url cases)
+        $conversionSourcesCounts = [];
+        $conversionSources = $article->conversionSources()
+            ->where('conversions.paid_at', '>=', $visitedFrom)
+            ->where('conversions.paid_at', '<', $visitedTo)
+            ->get();
+
+        foreach ($conversionSources as $conversionSource) {
+            $medium = $this->journalHelper->refererMediumLabel($conversionSource->referer_medium);
+            $source = empty($conversionSource->referer_source) ? $conversionSource->referer_host_with_path : $conversionSource->referer_source;
+            $type = $conversionSource->type;
+
+            if (!isset($conversionSourcesCounts[$medium][$source][$type])) {
+                $conversionSourcesCounts[$medium][$source][$type] = 0;
+            }
+            $conversionSourcesCounts[$medium][$source][$type]++;
+        }
+
         foreach ($aggregated as $medium => $mediumSources) {
             foreach ($mediumSources as $source => $count) {
                 $data->push([
                     'derived_referer_medium' => $medium,
                     'source' => $source,
+                    'first_conversion_source_count' => $conversionSourcesCounts[$medium][$source][ConversionSource::TYPE_SESSION_FIRST] ?? 0,
+                    'last_conversion_source_count' => $conversionSourcesCounts[$medium][$source][ConversionSource::TYPE_SESSION_LAST] ?? 0,
                     'visits_count' => $count,
+                ]);
+                if (isset($conversionSourcesCounts[$medium][$source][ConversionSource::TYPE_SESSION_FIRST])) {
+                    unset($conversionSourcesCounts[$medium][$source][ConversionSource::TYPE_SESSION_FIRST]);
+                }
+                if (isset($conversionSourcesCounts[$medium][$source][ConversionSource::TYPE_SESSION_LAST])) {
+                    unset($conversionSourcesCounts[$medium][$source][ConversionSource::TYPE_SESSION_LAST]);
+                }
+            }
+        }
+
+        // add also conversion sources that do not match witch article source
+        foreach ($conversionSourcesCounts as $medium => $mediumSources) {
+            foreach ($mediumSources as $source => $commerceCountByType) {
+                if (!isset($commerceCountByType[ConversionSource::TYPE_SESSION_FIRST]) && !isset($commerceCountByType[ConversionSource::TYPE_SESSION_LAST])) {
+                    continue;
+                }
+                $data->push([
+                    'derived_referer_medium' => $medium,
+                    'source' => $source,
+                    'first_conversion_source_count' => $commerceCountByType[ConversionSource::TYPE_SESSION_FIRST] ?? 0,
+                    'last_conversion_source_count' => $commerceCountByType[ConversionSource::TYPE_SESSION_LAST] ?? 0,
+                    'visits_count' => 0,
                 ]);
             }
         }

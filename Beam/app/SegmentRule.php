@@ -2,10 +2,13 @@
 
 namespace App;
 
-use Illuminate\Database\Eloquent\Model;
+use App\Model\BaseModel;
+use Illuminate\Database\Eloquent\Factories\HasFactory;
 
-class SegmentRule extends Model
+class SegmentRule extends BaseModel
 {
+    use HasFactory;
+
     protected $casts = [
         'fields' => 'json',
         'flags' => 'json',

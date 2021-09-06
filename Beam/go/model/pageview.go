@@ -36,26 +36,40 @@ type Pageview struct {
 	TitleVariant  string `json:"title_variant"`
 	ImageVariant  string `json:"image_variant"`
 	AuthorID      string `json:"author_id"`
-	UTMSource     string `json:"utm_source"`
-	UTMCampaign   string `json:"utm_campaign"`
-	UTMMedium     string `json:"utm_medium"`
-	UTMContent    string `json:"utm_content"`
+	ContentType   string `json:"content_type"`
 
-	Token        string    `json:"token"`
-	Time         time.Time `json:"time"`
-	IP           string    `json:"ip"`
-	UserID       string    `json:"user_id"`
-	URL          string    `json:"url"`
-	UserAgent    string    `json:"user_agent"`
-	BrowserID    string    `json:"browser_id"`
-	SessionID    string    `json:"remp_session_id"`
-	Referer      string    `json:"referer"`
-	Cookies      bool      `json:"cookies"`
-	SignedIn     bool      `json:"signed_in"`
-	Subscriber   bool      `json:"subscriber"`
-	WindowWidth  int       `json:"window_width"`
-	WindowHeight int       `json:"window_height"`
-	Timespent    int       `json:"timespent"`
+	RtmSource   string `json:"rtm_source"`
+	RtmCampaign string `json:"rtm_campaign"`
+	RtmMedium   string `json:"rtm_medium"`
+	RtmContent  string `json:"rtm_content"`
+
+	// UTM is deprecated, will be removed
+	UTMSource   string `json:"utm_source"`
+	UTMCampaign string `json:"utm_campaign"`
+	UTMMedium   string `json:"utm_medium"`
+	UTMContent  string `json:"utm_content"`
+
+	Token           string    `json:"token"`
+	Time            time.Time `json:"time"`
+	IP              string    `json:"ip"`
+	UserID          string    `json:"user_id"`
+	URL             string    `json:"url"`
+	CanonicalURL    string    `json:"canonical_url"`
+	UserAgent       string    `json:"user_agent"`
+	BrowserID       string    `json:"browser_id"`
+	SessionID       string    `json:"remp_session_id"`
+	Referer         string    `json:"referer"`
+	Cookies         bool      `json:"cookies"`
+	SignedIn        bool      `json:"signed_in"`
+	Subscriber      bool      `json:"subscriber"`
+	SubscriptionIDs []string  `json:"subscription_ids"`
+	WindowWidth     int       `json:"window_width"`
+	WindowHeight    int       `json:"window_height"`
+	Timespent       int       `json:"timespent"`
+
+	DerivedRefererMedium       string `json:"derived_referer_medium"`
+	DerivedRefererHostWithPath string `json:"derived_referer_host_with_path"`
+	DerivedRefererSource       string `json:"derived_referer_source"`
 }
 
 // PageviewRow represents one row of grouped list.

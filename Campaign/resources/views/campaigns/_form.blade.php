@@ -38,6 +38,7 @@ $segmentMap = $segments->flatten()->mapWithKeys(function ($item) {
         "oncePerSession": {!! @json($campaign->once_per_session) !!},
         "active": {!! @json($campaign->active) !!},
         "pageviewRules": {!! @json($campaign->pageview_rules) !!} || [],
+        "pageviewAttributes": {!! @json($campaign->pageview_attributes) !!} || [],
         "countries": {!! @json($selectedCountries) !!},
         "countriesBlacklist": {!! @json($countriesBlacklist ?? 0) !!},
         "allDevices": {!! @json($campaign->getAllDevices()) !!},
@@ -48,7 +49,7 @@ $segmentMap = $segments->flatten()->mapWithKeys(function ($item) {
         "urlPatterns": {!! @json($campaign->url_patterns) !!},
         "refererFilter": {!! @json($campaign->referer_filter) !!},
         "refererPatterns": {!! @json($campaign->referer_patterns) !!},
-        "statsLink": '{!! route('campaigns.stats', $campaign) !!}',
+        "statsLink": '{!! $campaign->id ? route('campaigns.stats', $campaign) : null !!}',
 
         "banners": {!! $banners->toJson(JSON_UNESCAPED_UNICODE) !!},
         "availableSegments": {!! $segments->toJson(JSON_UNESCAPED_UNICODE) !!},
@@ -81,7 +82,7 @@ $segmentMap = $segments->flatten()->mapWithKeys(function ($item) {
             }
         ],
         "activationMode": "activate-now",
-    };
+    }
     remplib.campaignForm.bind("#campaign-form", campaign);
 </script>
 

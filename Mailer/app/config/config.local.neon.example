@@ -1,3 +1,6 @@
+php:
+	intl.default_locale: sk_SK
+
 services:
     # All console commands you need to use should be registered here
     # This is a set that we recommend to use
@@ -8,6 +11,12 @@ services:
             # If you're using Beam, you can enable this command to pull conversions from there
             # - add(Remp\MailerModule\Commands\ProcessConversionStatsCommand())
 
+#	# Internal CRM system. For more details contact Tomas Bella.
+#	authenticator:
+#		factory: Remp\MailerModule\Models\Auth\Authenticator
+#	authStorage:
+#		factory: Remp\MailerModule\Models\Auth\RemoteUser(%sso_host%)
+
     embedParser:
         setup:
             - setVideoLinkText("Click to play video")
@@ -17,12 +26,12 @@ services:
             - setupLockLink("Registration", "https://www.demosite.com/registration")
 
     unsubscribeDroppedHandler:
-        class: Remp\MailerModule\Hermes\UnsubscribeDroppedHandler
+        factory: Remp\MailerModule\Hermes\UnsubscribeDroppedHandler
         setup:
             - setThreshold(3) # number of dropped emails before unsubscribing user
 
-    # restart hermes and mail worker with file (checks modification date; see SharedFileRestart implementation)
-    hermesRestart: Tomaj\Hermes\Restart\SharedFileRestart('/tmp/hermes_restart')
+    # shutdown hermes and mail worker with file (checks modification date; see SharedFileShutdown implementation)
+    hermesShutdown: Tomaj\Hermes\Shutdown\SharedFileShutdown('/tmp/hermes_shutdown')
     hermesWorker:
         setup:
             - add('email-dropped', @unsubscribeDroppedHandler)
@@ -41,34 +50,40 @@ services:
 
     # This is a reference IUser implementation.
     # You should make your own implementation against your CRM system and register it here.
-    - Remp\MailerModule\User\Dummy
+    - Remp\MailerModule\Models\Users\Dummy
 
     # To be able to send an email, you need to provide at least one ISegment implementation
     # You should make your own implementation against your CRM system and register it here.
     segmentAgreggator:
         setup:
-            - register(Remp\MailerModule\Segment\Dummy())
-#            - register(Remp\MailerModule\Segment\Beam(%remp.beam.segments_addr%))
-#            - register(Remp\MailerModule\Segment\Pythia(%remp.pythia.segments_addr%))
+            - register(Remp\MailerModule\Models\Segment\Dummy())
+#            - register(Remp\MailerModule\Models\Segment\Beam(%remp.beam.segments_addr%))
+#            - register(Remp\MailerModule\Models\Segment\Pythia(%remp.pythia.segments_addr%))
 
 #    - Remp\MailerModule\Tracker\Remp(%remp.beam.tracker_addr%, %remp.beam.tracker_property_token%)
 #    eventDispatcher:
-#        class: League\Event\EventDispatcher
+#        factory: League\Event\EventDispatcher
 #        setup:
 #            - subscribeTo(Remp\MailerModule\Events\MailSentEvent, Remp\MailerModule\Events\MailSentEventHandler())
 
     # If you're using Beam and want to use ProcessConversionStatsCommand, enable this repository (it's a dependency)
-#    - Remp\MailerModule\Repository\BeamConversionsRepository
+#    - Remp\MailerModule\Repositories\BeamConversionsRepository
+
+    # Setup of multiple mailers of the same type
+#	mailFactory:
+#		setup:
+#			- addMailer(Remp\MailerModule\Models\Mailer\MailgunMailer(), 'us')
+#			- addMailer(Remp\MailerModule\Models\Mailer\MailgunMailer(), 'eu')
 
 # local_configs override DBs configs records.
 local_configs:
 
     # Configuring usage of mailhog for local development
-    remp_mailermodule_mailer_smtpmailer_host: mailhog
-    remp_mailermodule_mailer_smtpmailer_port: 1025
-    remp_mailermodule_mailer_smtpmailer_username: ''
-    remp_mailermodule_mailer_smtpmailer_password: ''
-    remp_mailermodule_mailer_smtpmailer_secure: ''
+    remp_smtp_host: mailhog
+    remp_smtp_host_port: 1025
+    remp_smtp_host_username: ''
+    remp_smtp_host_password: ''
+    remp_smtp_host_secure: ''
 
 
 # If running Mailer on Valet, please uncomment the following lines and adjust the full path to REMP/Mailer folder

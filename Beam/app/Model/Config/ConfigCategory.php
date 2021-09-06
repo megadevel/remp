@@ -2,14 +2,15 @@
 
 namespace App\Model\Config;
 
-use App\Http\Request;
+use App\Model\BaseModel;
+use Illuminate\Http\Request;
 use App\Http\Requests\AuthorSegmentsConfigurationRequest;
-use Illuminate\Database\Eloquent\Model;
 
-class ConfigCategory extends Model
+class ConfigCategory extends BaseModel
 {
     const CODE_DASHBOARD = 'dashboard';
     const CODE_AUTHOR_SEGMENTS = 'author-segments';
+    const CODE_SECTION_SEGMENTS = 'section-segments';
 
     protected $fillable = [
         'code',

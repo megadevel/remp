@@ -8,8 +8,12 @@ import (
 var User = Type("User", func() {
 	Attribute("id", String, "ID of logged user")
 	Attribute("subscriber", Boolean, "Flag whether user is subscriber (has paid for access)")
+	Attribute("subscription_ids", ArrayOf(String), "List of currently active subscription IDs granting user access")
 	Attribute("browser_id", String, "Anonymized ID of user's browser")
 	Attribute("url", String, "URL of the content/conversion point", func() {
+		Format("uri")
+	})
+	Attribute("canonical_url", String, "Canonical URL of the content/conversion point. If not provided, value of url attribute is used.", func() {
 		Format("uri")
 	})
 	Attribute("adblock", Boolean, "Flag whether user has adblock enabled")
@@ -21,7 +25,7 @@ var User = Type("User", func() {
 	Attribute("ip_address", String, "IP address of client", func() {
 		Format("ip")
 	})
-	Attribute("source", Source, "UTM and social source metadata")
+	Attribute("source", Source, "RTM (REMP-like UTM) and social source metadata")
 	Attribute("remp_session_id", String, "ID of reader's session")
 	Attribute("remp_pageview_id", String, "ID of pageview")
 	Attribute("referer", String, "Value of HTTP referer header (if present)")
@@ -59,6 +63,7 @@ var Commerce = Type("Commerce", func() {
 		Enum("checkout", "payment", "purchase", "refund")
 	})
 	Attribute("remp_commerce_id", String, "ID of event")
+	Attribute("commerce_session_id", String, "ID of session for whole commerce process. Unique identifier should be generated on client-side when user starts commerce process at the checkout step and the client should track the same value for rest of commerce process.")
 	Attribute("checkout", CommerceCheckout, "Used when user enters the checkout process (reviews the cart)")
 	Attribute("payment", CommercePayment, "Used when user confirmed checkout and was redirected to the payment processor")
 	Attribute("purchase", CommercePayment, "Used when payment processor confirms the payment")
@@ -91,6 +96,7 @@ var Article = Type("Article", func() {
 	Attribute("category", String, "Page category (homepage, world news...")
 	Attribute("tags", ArrayOf(String), "List of tags (breaking news, trump...")
 	Attribute("author_id", String, "ID of author")
+	Attribute("content_type", String, "Content type, e.g. 'article' (by default)")
 	Attribute("locked", Boolean, "Flag whether content was locked for the visitor")
 	Attribute("variants", HashOf(String, String), "Hash of key-value pairs bearing A/B test variant information (what's A/B-tested / variant label)")
 
@@ -125,11 +131,18 @@ var Progress = Type("Progress", func() {
 var Source = Type("source", func() {
 	Description("User-source related data")
 
-	Attribute("utm_source", String, "Origin of user (e.g. remp_campaign)")
-	Attribute("utm_medium", String, "Medium through which the came (e.g. overlay, inline)")
-	Attribute("utm_campaign", String, "Reference to specific campaign (e.g. campaign ID")
-	Attribute("utm_content", String, "Reference to specific campaign mean (e.g. banner ID)")
-	Attribute("banner_variant", String, "Reference to specific banner variant (e.g. variant ID)")
+	Attribute("rtm_source", String, "Origin of user (e.g. remp_campaign)")
+	Attribute("rtm_medium", String, "Medium through which the came (e.g. overlay, inline)")
+	Attribute("rtm_campaign", String, "Reference to specific campaign (e.g. campaign ID")
+	Attribute("rtm_content", String, "Reference to specific campaign mean (e.g. banner ID)")
+	Attribute("rtm_variant", String, "Reference to specific banner variant (e.g. variant ID)")
+
+	// Deprecated, to be removed (replaced with rtm_)
+	Attribute("utm_source", String, "[DEPRECATED] Origin of user (e.g. remp_campaign). Deprecated, please use `rtm_source`")
+	Attribute("utm_medium", String, "[DEPRECATED] Medium through which the came (e.g. overlay, inline). Deprecated, please use `rtm_medium`")
+	Attribute("utm_campaign", String, "[DEPRECATED] Reference to specific campaign (e.g. campaign ID). Deprecated, please use `rtm_campaign`")
+	Attribute("utm_content", String, "[DEPRECATED] Reference to specific campaign mean (e.g. banner ID). Deprecated, please use `rtm_content`")
+	Attribute("banner_variant", String, "[DEPRECATED] Reference to specific banner variant (e.g. variant ID). . Deprecated, please use `rtm_variant`")
 })
 
 var CommerceCheckout = Type("CommerceCheckout", func() {

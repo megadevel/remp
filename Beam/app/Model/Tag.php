@@ -2,11 +2,14 @@
 
 namespace App\Model;
 
+use Illuminate\Database\Eloquent\Factories\HasFactory;
 use App\Article;
-use Illuminate\Database\Eloquent\Model;
+use App\TagCategory;
 
-class Tag extends Model
+class Tag extends BaseModel
 {
+    use HasFactory;
+
     protected $fillable = [
         'name',
         'external_id',
@@ -20,5 +23,10 @@ class Tag extends Model
     public function articles()
     {
         return $this->hasMany(Article::class);
+    }
+
+    public function tagCategories()
+    {
+        return $this->belongsToMany(TagCategory::class);
     }
 }

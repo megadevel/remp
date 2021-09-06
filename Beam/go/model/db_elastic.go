@@ -79,9 +79,50 @@ func (eDB *ElasticDB) boolQueryFromOptions(index string, o AggregateOptions) (*e
 
 		if f.Inverse {
 			bq = bq.MustNot(elastic.NewTermsQuery(field, interfaceSlice...))
-		} else {
-			bq = bq.Must(elastic.NewTermsQuery(field, interfaceSlice...))
 
+			// UTM parameters have been renamed to RTM
+			// We still want to keep the backwards compatibility by translating UTM conditions to RTM
+			// However, filtering by utm_ is deprecated and will be removed in the future
+			if strings.HasPrefix(field, "banner_variant") { // full field should be banner_variant.keyword
+				bq = bq.MustNot(elastic.NewTermsQuery("rtm_"+field[7:], interfaceSlice...))
+			} else if strings.HasPrefix(field, "rtm_variant") {
+				bq = bq.MustNot(elastic.NewTermsQuery("banner_"+field[4:], interfaceSlice...))
+			} else if strings.HasPrefix(field, "utm_") {
+				bq = bq.MustNot(elastic.NewTermsQuery("rtm_"+field[4:], interfaceSlice...))
+			} else if strings.HasPrefix(field, "rtm_") {
+				bq = bq.MustNot(elastic.NewTermsQuery("utm_"+field[4:], interfaceSlice...))
+			}
+		} else {
+			// UTM parameters have been renamed to RTM
+			// We still want to keep the backwards compatibility by translating UTM conditions to RTM (joined by OR operator)
+			// However, filtering by utm_ is deprecated and will be removed in the future
+			if strings.HasPrefix(field, "banner_variant") {
+				bannerVariantTerm := elastic.NewTermsQuery(field, interfaceSlice...)
+				rtmTerm := elastic.NewTermsQuery("rtm_"+field[7:], interfaceSlice...)
+				bqInner := elastic.NewBoolQuery()
+				bqInner.Should(bannerVariantTerm, rtmTerm)
+				bq = bq.Must(bqInner)
+			} else if strings.HasPrefix(field, "rtm_variant") {
+				rtmTerm := elastic.NewTermsQuery(field, interfaceSlice...)
+				bannerVariantTerm := elastic.NewTermsQuery("banner_"+field[4:], interfaceSlice...)
+				bqInner := elastic.NewBoolQuery()
+				bqInner.Should(bannerVariantTerm, rtmTerm)
+				bq = bq.Must(bqInner)
+			} else if strings.HasPrefix(field, "utm_") {
+				utmTerm := elastic.NewTermsQuery(field, interfaceSlice...)
+				rtmTerm := elastic.NewTermsQuery("rtm_"+field[4:], interfaceSlice...)
+				bqInner := elastic.NewBoolQuery()
+				bqInner.Should(utmTerm, rtmTerm) // Should for 2 terms = OR
+				bq = bq.Must(bqInner)
+			} else if strings.HasPrefix(field, "rtm_") {
+				rtmTerm := elastic.NewTermsQuery(field, interfaceSlice...)
+				utmTerm := elastic.NewTermsQuery("utm_"+field[4:], interfaceSlice...)
+				bqInner := elastic.NewBoolQuery()
+				bqInner.Should(utmTerm, rtmTerm)
+				bq = bq.Must(bqInner)
+			} else {
+				bq = bq.Must(elastic.NewTermsQuery(field, interfaceSlice...))
+			}
 		}
 	}
 
@@ -192,7 +233,7 @@ func (eDB *ElasticDB) countRowCollectionFromAggregations(result *elastic.SearchR
 				for _, countHistogramItem := range histogramData.Buckets {
 					countHistogram = append(countHistogram, CountHistogramItem{
 						BucketKey: countHistogramItem.Key,
-						Value:     float64(countHistogramItem.DocCount),
+						Value:     int(countHistogramItem.DocCount),
 					})
 				}
 			}
@@ -391,12 +432,17 @@ func (eDB *ElasticDB) uniqueRowCollectionFromAggregations(result *elastic.Search
 			}
 		} else {
 			avgAgg, ok := aggregations.Cardinality(targetAgg)
-			if !ok {
-				return nil
-			}
-
-			if avgAgg.Value != nil {
-				countValue = *avgAgg.Value
+			if ok {
+				if avgAgg.Value != nil {
+					countValue = *avgAgg.Value
+				}
+			} else {
+				// The aggregation was not resolved based on the all provided srcTags to group by.
+				// UnwrapAggregation uses "" as a placeholder value for the unresolved levels to make srcTags complete.
+				//
+				// Since elastic doesn't have the aggregate value available as a resolved aggregation,
+				// it should be save to use docCount available at the level we're currently at.
+				countValue = float64(count)
 			}
 		}
 
@@ -425,50 +471,159 @@ func (eDB *ElasticDB) uniqueRowCollectionFromAggregations(result *elastic.Search
 
 // addCompositeGroupBy creates a composite aggregation. The results are fetchable
 // via countRowCollectionFromCompositeBuckets or sumRowCollectionFromCompositeBuckets.
-func (eDB *ElasticDB) addCompositeGroupBy(search *elastic.SearchService, index string, o AggregateOptions) (*elastic.SearchService, error) {
+func (eDB *ElasticDB) addCompositeGroupBy(search *elastic.SearchService, index string, afterKey map[string]interface{}, o AggregateOptions) (*elastic.SearchService, bool, error) {
+	aggregationAdded := false
+	compositeAgg := elastic.NewCompositeAggregation()
+	compositeAgg.AggregateAfter(afterKey)
+	compositeAgg.Size(10000)
+
+	// handle time histogram
+	if o.TimeHistogram != nil {
+		tz := "UTC"
+		if o.TimeHistogram.TimeZone != nil {
+			tz = o.TimeHistogram.TimeZone.String()
+		}
+		compositeAgg = compositeAgg.Sources(
+			elastic.NewCompositeAggregationDateHistogramValuesSource("time_histogram").
+				Field("time").
+				FixedInterval(o.TimeHistogram.Interval).
+				Format("date_optional_time").
+				TimeZone(tz).
+				MissingBucket(true),
+		)
+		aggregationAdded = true
+	}
+
+	// handle count histogram
+	if o.CountHistogram != nil {
+		compositeAgg = compositeAgg.Sources(
+			elastic.NewCompositeAggregationHistogramValuesSource("count_histogram", o.CountHistogram.Interval).
+				Field(o.CountHistogram.Field).
+				MissingBucket(true),
+		)
+		aggregationAdded = true
+	}
+
+	// handle regular group by
 	if len(o.GroupBy) > 0 {
-		nestedAgg := elastic.NewCompositeAggregation()
 		for _, g := range o.GroupBy {
 			f, err := eDB.resolveKeyword(index, g)
 			if err != nil {
-				return nil, err
+				return nil, false, err
 			}
-			agg := elastic.NewCompositeAggregationTermsValuesSource(g).Field(f)
-			nestedAgg = nestedAgg.Sources(agg)
-		}
 
-		search = search.Aggregation("buckets", nestedAgg)
+			compositeAgg = compositeAgg.Sources(
+				elastic.NewCompositeAggregationTermsValuesSource(g).Field(f).MissingBucket(true),
+			)
+			aggregationAdded = true
+		}
 	}
 
-	return search, nil
+	if aggregationAdded {
+		search = search.Aggregation("buckets", compositeAgg)
+	}
+
+	return search, aggregationAdded, nil
 }
 
 // countRowCollectionFromCompositeBuckets extracts CountRow data from buckets generated by composite aggregation query.
-func (eDB *ElasticDB) countRowCollectionFromCompositeBuckets(buckets []*elastic.AggregationBucketKeyItem) (CountRowCollection, bool, error) {
+func (eDB *ElasticDB) countRowCollectionFromCompositeBuckets(buckets []*elastic.AggregationBucketCompositeItem, o AggregateOptions) (CountRowCollection, error) {
 	crc := CountRowCollection{}
 
+	if len(buckets) == 0 {
+		return crc, nil
+	}
+
+	crmap := make(map[string]*CountRow)
+
 	for _, bucket := range buckets {
-		keys, ok := bucket.Key.(map[string]interface{}) // composite aggregation has map[string]interface{} bucket keys
-		if !ok {
-			return nil, false, fmt.Errorf("unexpected type of bucket key: %T", bucket.Key)
+		var timeHistogramItem TimeHistogramItem
+		var countHistogramItem CountHistogramItem
+		var timeHistogramTotal, countHistogramTotal int
+
+		// time histogram handler
+		if o.TimeHistogram != nil {
+			bucketKey, ok := bucket.Key["time_histogram"].(string)
+			if !ok {
+				return nil, errors.New("missing expected time_histogram aggregation data")
+			}
+
+			time, err := time.Parse(time.RFC3339, bucketKey)
+			if err != nil {
+				errors.New(fmt.Sprintf("cant parse time from elastic search with RFC3339 layout: %s", bucketKey))
+			}
+
+			timeHistogramTotal += int(bucket.DocCount)
+			timeHistogramItem = TimeHistogramItem{
+				Time:  time,
+				Value: float64(bucket.DocCount),
+			}
+
+			// cleanup so it's not processed by default tag handler below
+			delete(bucket.Key, "time_histogram")
 		}
+
+		// count histogram handler
+		if o.CountHistogram != nil {
+			bucketKey, ok := bucket.Key["count_histogram"].(float64)
+			if !ok {
+				return nil, errors.New("missing expected count_histogram aggregation data")
+			}
+
+			countHistogramTotal += int(bucket.DocCount)
+			countHistogramItem = CountHistogramItem{
+				BucketKey: bucketKey,
+				Value:     int(bucket.DocCount),
+			}
+
+			// cleanup so it's not processed by default tag handler below
+			delete(bucket.Key, "count_histogram")
+		}
+
+		// handle group bys
 		tags := make(map[string]string)
-		for key, val := range keys {
+		var rowKey string
+
+		for key, val := range bucket.Key {
 			switch tag := val.(type) {
 			case float64:
 				tags[key] = strconv.FormatFloat(tag, 'f', 0, 64)
 			case string:
 				tags[key] = tag
+			case bool:
+				tags[key] = strconv.FormatBool(tag)
+			case nil:
+				tags[key] = ""
 			default:
-				return nil, false, fmt.Errorf("unexpected type of aggregation bucket count: %T", val)
+				return nil, fmt.Errorf("unexpected type of aggregation bucket count: %T", val)
 			}
+			rowKey = fmt.Sprintf("%s_%s-%s", rowKey, key, tags[key])
 		}
-		crc = append(crc, CountRow{
-			Tags:  tags,
-			Count: int(bucket.DocCount),
-		})
+
+		row, ok := crmap[rowKey]
+		if !ok {
+			row = &CountRow{
+				Tags: tags,
+			}
+			crmap[rowKey] = row
+		}
+		if o.TimeHistogram != nil {
+			row.TimeHistogram = append(row.TimeHistogram, timeHistogramItem)
+			row.Count += timeHistogramTotal
+		}
+		if o.CountHistogram != nil {
+			row.CountHistogram = append(row.CountHistogram, countHistogramItem)
+			row.Count += countHistogramTotal
+		}
+		if row.Count == 0 {
+			row.Count = int(bucket.DocCount)
+		}
 	}
-	return crc, true, nil
+
+	for _, row := range crmap {
+		crc = append(crc, *row)
+	}
+	return crc, nil
 }
 
 // sumRowCollectionFromBuckets extracts SumRow data from buckets generated by composite aggregation query.
@@ -544,7 +699,9 @@ func (eDB *ElasticDB) resolveZeroValue(index, field string) (interface{}, error)
 	switch def {
 	case "text":
 		return "", nil
-	case "boolean", "date":
+	case "boolean":
+		return false, nil
+	case "date":
 		return nil, nil
 	case "long":
 		return 0, nil

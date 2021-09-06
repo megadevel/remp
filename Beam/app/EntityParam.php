@@ -2,10 +2,10 @@
 
 namespace App;
 
-use Illuminate\Database\Eloquent\Model;
+use App\Model\BaseModel;
 use Illuminate\Database\Eloquent\SoftDeletes;
 
-class EntityParam extends Model
+class EntityParam extends BaseModel
 {
     use SoftDeletes;
 
@@ -17,8 +17,6 @@ class EntityParam extends Model
     const TYPE_DATETIME = "datetime";
 
     protected $table = 'entity_params';
-
-    protected $dates = ['deleted_at'];
 
     protected $fillable = [
         'id',

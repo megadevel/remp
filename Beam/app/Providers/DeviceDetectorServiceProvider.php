@@ -2,30 +2,21 @@
 
 namespace App\Providers;
 
-use Madewithlove\IlluminatePsrCacheBridge\Laravel\CacheItemPool;
-use Illuminate\Contracts\Cache\Repository;
-use Illuminate\Support\ServiceProvider;
 use DeviceDetector\Cache\PSR6Bridge;
+use Illuminate\Contracts\Support\DeferrableProvider;
+use Illuminate\Support\ServiceProvider;
 use DeviceDetector\DeviceDetector;
 
-class DeviceDetectorServiceProvider extends ServiceProvider
+class DeviceDetectorServiceProvider extends ServiceProvider implements DeferrableProvider
 {
-    /**
-     * Indicates if loading of the provider is deferred.
-     *
-     * @var bool
-     */
-    protected $defer = true;
-
     public function register()
     {
         $this->app->bind(DeviceDetector::class, function ($app) {
             $dd = new DeviceDetector();
-            $dd->setCache(
-                new PSR6Bridge(
-                    new CacheItemPool($app->make(Repository::class))
-                )
-            );
+
+            // 'symfony/cache' dependency provides Psr16Adapter cache adapter
+            $cache = app('cache.psr6');
+            $dd->setCache(new PSR6Bridge($cache));
 
             return $dd;
         });

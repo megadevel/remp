@@ -4,9 +4,8 @@ namespace App\Model;
 
 use App\Article;
 use App\Conversion;
-use Illuminate\Database\Eloquent\Model;
 
-class ConversionPageviewEvent extends Model
+class ConversionPageviewEvent extends BaseModel
 {
     protected $casts = [
         'locked' => 'boolean',
@@ -21,10 +20,10 @@ class ConversionPageviewEvent extends Model
         'locked',
         'signed_in',
         'timespent',
-        'utm_campaign',
-        'utm_content',
-        'utm_medium',
-        'utm_source',
+        'rtm_campaign',
+        'rtm_content',
+        'rtm_medium',
+        'rtm_source',
         'conversion_id',
         'minutes_to_conversion',
         'event_prior_conversion',

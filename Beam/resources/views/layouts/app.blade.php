@@ -67,7 +67,7 @@
                     <input class="js-typeahead hs-input typeahead"
                            name="q"
                            autocomplete="off"
-                           placeholder="Search for articles, authors and segments">
+                           placeholder="Search for articles (titles and IDs), authors, and segments">
                     <i class="zmdi zmdi-search hs-reset" data-ma-action="search-clear"></i>
                 </div>
             </div>
@@ -118,7 +118,7 @@
                 </ul>
             </li>
             <li class="m-b-15"></li>
-            <li {!! route_active(['segments', 'entities', 'authorSegments.index'], 'sub-menu', 'toggled') !!}>
+            <li {!! route_active(['segments', 'entities', 'authorSegments.index', 'sectionSegments.index'], 'sub-menu', 'toggled') !!}>
                 <a href="#" data-ma-action="submenu-toggle" ><i class="zmdi zmdi-accounts-list-alt"></i> Segments</a>
                 <ul>
                     <li {!! route_active(['segments']) !!}>
@@ -126,6 +126,9 @@
                     </li>
                     <li {!! route_active(['authorSegments.index']) !!}>
                         <a href="{{ route('authorSegments.index') }}" ><i class="zmdi zmdi-accounts-list m-r-5"></i> Author segments</a>
+                    </li>
+                    <li {!! route_active(['sectionSegments.index']) !!}>
+                        <a href="{{ route('sectionSegments.index') }}" ><i class="zmdi zmdi-accounts-list m-r-5"></i> Section segments</a>
                     </li>
                     <li {!! route_active(['entities']) !!}>
                         <a href="{{ route('entities.index') }}" ><i class="zmdi zmdi-crop-free m-r-5"></i> Entities</a>
@@ -162,6 +165,15 @@
             </li>
             <li {!! route_active(['authors']) !!}>
                 <a href="{{ route('authors.index') }}" ><i class="zmdi zmdi-account-box"></i> Authors</a>
+            </li>
+            <li {!! route_active(['sections']) !!}>
+                <a href="{{ route('sections.index') }}" ><i class="zmdi zmdi-collection-text"></i> Sections</a>
+            </li>
+            <li {!! route_active(['tags']) !!}>
+                <a href="{{ route('tags.index') }}" ><i class="zmdi zmdi-label"></i> Tags</a>
+            </li>
+            <li {!! route_active(['tag-categories']) !!}>
+                <a href="{{ route('tag-categories.index') }}" ><i class="zmdi zmdi-filter-list"></i> Tag Categories</a>
             </li>
             <li {!! route_active(['visitors.devices', 'visitors.sources'], 'sub-menu', 'toggled') !!}>
                 <a href="#" data-ma-action="submenu-toggle"><i class="zmdi zmdi-face"></i> Visitors</a>

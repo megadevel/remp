@@ -28,7 +28,7 @@ class JournalHelpers
     {
         $timeBefore = $now;
         if ($timeBefore === null) {
-            $timeBefore = Carbon::now();
+            $timeBefore = Carbon::now()->microsecond(0);
         }
 
         $timeAfter = (clone $timeBefore)->subSeconds(600); // Last 10 minutes
@@ -161,7 +161,7 @@ class JournalHelpers
             })->unique()->count() > 1;
 
             $hasImageTest = $item->image_variants->filter(function ($variant) {
-                    return $variant !== '';
+                return $variant !== '';
             })->unique()->count() > 1;
 
             return (object) [

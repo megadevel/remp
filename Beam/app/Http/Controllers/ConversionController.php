@@ -2,20 +2,19 @@
 
 namespace App\Http\Controllers;
 
+use App\Article;
 use App\Author;
-use App\Console\Commands\AggregateConversionEvents;
 use App\Conversion;
-use App\Http\Request;
+use Illuminate\Http\Request;
 use App\Http\Requests\ConversionRequest;
 use App\Http\Requests\ConversionUpsertRequest;
 use App\Http\Resources\ConversionResource;
+use App\Jobs\ProcessConversionJob;
 use App\Model\Tag;
 use App\Section;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Support\Carbon;
-use Illuminate\Support\Facades\Artisan;
 use Illuminate\Support\Facades\Log;
-use Remp\LaravelHelpers\Resources\JsonResource;
 use Yajra\Datatables\Datatables;
 
 class ConversionController extends Controller
@@ -24,6 +23,7 @@ class ConversionController extends Controller
     {
         return response()->format([
             'html' => view('conversions.index', [
+                'contentTypes' => Article::groupBy('content_type')->pluck('content_type', 'content_type'),
                 'authors' => Author::all()->pluck('name', 'id'),
                 'sections' => Section::all()->pluck('name', 'id'),
                 'tags' => Tag::all()->pluck('name', 'id'),
@@ -36,15 +36,15 @@ class ConversionController extends Controller
 
     public function json(Request $request, Datatables $datatables)
     {
-        $conversions = Conversion::select('conversions.*')
+        $conversions = Conversion::select('conversions.*', 'articles.content_type')
             ->with(['article', 'article.authors', 'article.sections', 'article.tags'])
             ->join('articles', 'articles.id', '=', 'conversions.article_id');
 
         if ($request->input('conversion_from')) {
-            $conversions->where('paid_at', '>=', Carbon::parse($request->input('conversion_from'), $request->input('tz'))->tz('UTC'));
+            $conversions->where('paid_at', '>=', Carbon::parse($request->input('conversion_from'), $request->input('tz')));
         }
         if ($request->input('conversion_to')) {
-            $conversions->where('paid_at', '<=', Carbon::parse($request->input('conversion_to'), $request->input('tz'))->tz('UTC'));
+            $conversions->where('paid_at', '<=', Carbon::parse($request->input('conversion_to'), $request->input('tz')));
         }
 
         return $datatables->of($conversions)
@@ -59,29 +59,33 @@ class ConversionController extends Controller
             ->filterColumn('article.title', function (Builder $query, $value) {
                 $query->where('articles.title', 'like', '%' . $value . '%');
             })
+            ->filterColumn('content_type', function (Builder $query, $value) {
+                $values = explode(',', $value);
+                $query->whereIn('articles.content_type', $values);
+            })
             ->filterColumn('article.authors[, ].name', function (Builder $query, $value) {
                 $values = explode(",", $value);
                 $filterQuery = \DB::table('articles')
+                    ->select(['articles.id'])
                     ->join('article_author', 'articles.id', '=', 'article_author.article_id', 'left')
                     ->whereIn('article_author.author_id', $values);
-                $articleIds = $filterQuery->pluck('articles.id')->toArray();
-                $query->whereIn('articles.id', $articleIds);
+                $query->whereIn('articles.id', $filterQuery);
             })
             ->filterColumn('article.sections[, ].name', function (Builder $query, $value) {
                 $values = explode(",", $value);
                 $filterQuery = \DB::table('articles')
+                    ->select(['articles.id'])
                     ->join('article_section', 'articles.id', '=', 'article_section.article_id', 'left')
                     ->whereIn('article_section.section_id', $values);
-                $articleIds = $filterQuery->pluck('articles.id')->toArray();
-                $query->whereIn('articles.id', $articleIds);
+                $query->whereIn('articles.id', $filterQuery);
             })
             ->filterColumn('article.tags[, ].name', function (Builder $query, $value) {
                 $values = explode(",", $value);
                 $filterQuery = \DB::table('articles')
+                    ->select(['articles.id'])
                     ->join('article_tag', 'articles.id', '=', 'article_tag.article_id', 'left')
                     ->whereIn('article_tag.tag_id', $values);
-                $articleIds = $filterQuery->pluck('articles.id')->toArray();
-                $query->whereIn('articles.id', $articleIds);
+                $query->whereIn('articles.id', $filterQuery);
             })
             ->rawColumns(['actions'])
             ->make(true);
@@ -114,7 +118,7 @@ class ConversionController extends Controller
             if ($event->article) {
                 $t = new \stdClass();
                 $t->title = $event->article->title;
-                $t->href = route('articles.show', $event->article->id);
+                $t->href = route('articles.show', ['article' => $event->article->id]);
                 $obj->tags[] = $t;
             }
 
@@ -181,7 +185,7 @@ class ConversionController extends Controller
         foreach ($request->get('conversions', []) as $c) {
             // When saving to DB, Eloquent strips timezone information,
             // therefore convert to UTC
-            $c['paid_at'] = Carbon::parse($c['paid_at'])->tz('UTC');
+            $c['paid_at'] = Carbon::parse($c['paid_at']);
             $conversion = Conversion::firstOrNew([
                 'transaction_id' => $c['transaction_id'],
             ]);
@@ -191,9 +195,7 @@ class ConversionController extends Controller
             $conversions[] = $conversion;
 
             if (!$conversion->events_aggregated) {
-                Artisan::queue(AggregateConversionEvents::COMMAND, [
-                    '--conversion_id' => $conversion->id
-                ]);
+                ProcessConversionJob::dispatch($conversion);
             }
         }
 

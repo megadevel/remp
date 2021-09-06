@@ -48,7 +48,7 @@
 
 
 <script type="text/javascript">
-    import vSelect from "remp/js/components/vSelect.vue";
+    import vSelect from "@remp/js-commons/js/components/vSelect.vue";
     import Url from "./Url";
 
     export default {
@@ -76,7 +76,7 @@
         created: function () {
             this.urlFilterType = this.urlFilter;
 
-            if (this.urlPatterns) {
+            if (this.urlPatterns && this.urlPatterns.length > 0) {
                 for (let ii = 0; ii < this.urlPatterns.length; ii++) {
                     this.urlPatternList.push({
                         uid: this.generateUid(),

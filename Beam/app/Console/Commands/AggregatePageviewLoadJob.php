@@ -5,7 +5,7 @@ namespace App\Console\Commands;
 use App\Article;
 use App\ArticlePageviews;
 use App\Helpers\DebugProxy;
-use Illuminate\Console\Command;
+use App\Console\Command;
 use Illuminate\Support\Carbon;
 use Remp\Journal\AggregateRequest;
 use Remp\Journal\JournalContract;
@@ -25,7 +25,7 @@ class AggregatePageviewLoadJob extends Command
         $articleId = $this->option('article_id') ?? null;
         $now = $this->option('now') ? Carbon::parse($this->option('now')) : Carbon::now();
 
-        $timeBefore = $now->minute(0)->second(0);
+        $timeBefore = $now->minute(0)->second(0)->microsecond(0);
         $timeAfter = (clone $timeBefore)->subHour();
 
         $this->line(sprintf("Fetching aggregated pageviews data from <info>%s</info> to <info>%s</info>.", $timeAfter, $timeBefore));
@@ -41,7 +41,7 @@ class AggregatePageviewLoadJob extends Command
 
         if (count($records) === 0 || (count($records) === 1 && !isset($records[0]->tags->article_id))) {
             $this->line(sprintf("No articles to process, exiting."));
-            return;
+            return 0;
         }
 
         /** @var ProgressBar $bar */
@@ -67,10 +67,10 @@ class AggregatePageviewLoadJob extends Command
             $subscribers[$articleId] = $subscribers[$articleId] ?? 0;
 
             $all[$articleId] += $record->count;
-            if ($record->tags->signed_in === '1') {
+            if (filter_var($record->tags->signed_in, FILTER_VALIDATE_BOOLEAN) === true) {
                 $signedIn[$articleId] += $record->count;
             }
-            if ($record->tags->subscriber === '1') {
+            if (filter_var($record->tags->subscriber, FILTER_VALIDATE_BOOLEAN) === true) {
                 $subscribers[$articleId] += $record->count;
             }
 
@@ -81,7 +81,7 @@ class AggregatePageviewLoadJob extends Command
 
         if (count($all) === 0) {
             $this->line(sprintf('No data to store for articles, exiting.'));
-            return;
+            return 0;
         }
 
         $externalIdsChunks =  array_chunk(array_keys($all), 200);
@@ -121,5 +121,6 @@ class AggregatePageviewLoadJob extends Command
 
         $bar->finish();
         $this->line(" <info>OK!</info> (number of processed articles: $processedArticles)");
+        return 0;
     }
 }

@@ -1,5 +1,6 @@
 <?php
 
+use Database\Seeders\CountrySeeder;
 use Illuminate\Support\Facades\Schema;
 use Illuminate\Database\Schema\Blueprint;
 use Illuminate\Database\Migrations\Migration;
@@ -34,7 +35,7 @@ class CampaignGeotargeting extends Migration
 
         });
 
-        Artisan::call('db:seed', array('--class' => CountrySeeder::class));
+        Artisan::call('db:seed', ['--class' => CountrySeeder::class]);
     }
 
     /**

@@ -2,11 +2,9 @@
 
 namespace App\Model;
 
-use App\Article;
 use App\Conversion;
-use Illuminate\Database\Eloquent\Model;
 
-class ConversionGeneralEvent extends Model
+class ConversionGeneralEvent extends BaseModel
 {
     protected $casts = [
         'minutes_to_conversion' => 'integer',
@@ -18,10 +16,10 @@ class ConversionGeneralEvent extends Model
         'action',
         'category',
         'conversion_id',
-        'utm_campaign',
-        'utm_content',
-        'utm_medium',
-        'utm_source',
+        'rtm_campaign',
+        'rtm_content',
+        'rtm_medium',
+        'rtm_source',
         'minutes_to_conversion',
         'event_prior_conversion',
     ];

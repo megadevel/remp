@@ -4,11 +4,10 @@ namespace App\Http\Controllers;
 
 use App\Article;
 use App\ArticleAuthor;
+use App\ArticlesDataTable;
 use App\Author;
 use App\Conversion;
-use App\Http\Requests\TopSearchRequest;
 use App\Http\Resources\AuthorResource;
-use App\Model\Pageviews\TopSearch;
 use App\Model\Tag;
 use App\Section;
 use Illuminate\Database\Eloquent\Builder;
@@ -39,8 +38,10 @@ class AuthorController extends Controller
         return response()->format([
             'html' => view('authors.show', [
                 'author' => $author,
+                'contentTypes' => Article::groupBy('content_type')->pluck('content_type', 'content_type'),
                 'sections' => Section::all()->pluck('name', 'id'),
                 'tags' => Tag::all()->pluck('name', 'id'),
+                'authors' => Author::all()->pluck('name', 'id'),
                 'publishedFrom' => $request->input('published_from', 'today - 30 days'),
                 'publishedTo' => $request->input('published_to', 'now'),
                 'conversionFrom' => $request->input('conversion_from', 'today - 30 days'),
@@ -98,24 +99,24 @@ class AuthorController extends Controller
             ->groupBy('author_id');
 
         if ($request->input('published_from')) {
-            $publishedFrom = Carbon::parse($request->input('published_from'), $request->input('tz'))->tz('UTC');
+            $publishedFrom = Carbon::parse($request->input('published_from'), $request->input('tz'));
             $authorArticlesQuery->where('published_at', '>=', $publishedFrom);
             $conversionsQuery->where('published_at', '>=', $publishedFrom);
             $pageviewsQuery->where('published_at', '>=', $publishedFrom);
         }
 
         if ($request->input('published_to')) {
-            $publishedTo = Carbon::parse($request->input('published_to'), $request->input('tz'))->tz('UTC');
+            $publishedTo = Carbon::parse($request->input('published_to'), $request->input('tz'));
             $authorArticlesQuery->where('published_at', '<=', $publishedTo);
             $conversionsQuery->where('published_at', '<=', $publishedTo);
             $pageviewsQuery->where('published_at', '<=', $publishedTo);
         }
         if ($request->input('conversion_from')) {
-            $conversionFrom = Carbon::parse($request->input('conversion_from'), $request->input('tz'))->tz('UTC');
+            $conversionFrom = Carbon::parse($request->input('conversion_from'), $request->input('tz'));
             $conversionsQuery->where('paid_at', '>=', $conversionFrom);
         }
         if ($request->input('conversion_to')) {
-            $conversionTo = Carbon::parse($request->input('conversion_to'), $request->input('tz'))->tz('UTC');
+            $conversionTo = Carbon::parse($request->input('conversion_to'), $request->input('tz'));
             $conversionsQuery->where('paid_at', '<=', $conversionTo);
         }
 
@@ -133,17 +134,17 @@ class AuthorController extends Controller
             ->groupBy(['article_author.author_id', 'conversions.currency']);
 
         if ($request->input('published_from')) {
-            $conversionsQuery->where('published_at', '>=', Carbon::parse($request->input('published_from'), $request->input('tz'))->tz('UTC'));
+            $conversionsQuery->where('published_at', '>=', Carbon::parse($request->input('published_from'), $request->input('tz')));
         }
         if ($request->input('published_to')) {
-            $conversionsQuery->where('published_at', '<=', Carbon::parse($request->input('published_to'), $request->input('tz'))->tz('UTC'));
+            $conversionsQuery->where('published_at', '<=', Carbon::parse($request->input('published_to'), $request->input('tz')));
         }
         if ($request->input('conversion_from')) {
-            $conversionFrom = Carbon::parse($request->input('conversion_from'), $request->input('tz'))->tz('UTC');
+            $conversionFrom = Carbon::parse($request->input('conversion_from'), $request->input('tz'));
             $conversionsQuery->where('paid_at', '>=', $conversionFrom);
         }
         if ($request->input('conversion_to')) {
-            $conversionTo = Carbon::parse($request->input('conversion_to'), $request->input('tz'))->tz('UTC');
+            $conversionTo = Carbon::parse($request->input('conversion_to'), $request->input('tz'));
             $conversionsQuery->where('paid_at', '<=', $conversionTo);
         }
 
@@ -158,12 +159,17 @@ class AuthorController extends Controller
             ->addColumn('name', function (Author $author) {
                 return Html::linkRoute('authors.show', $author->name, $author);
             })
-            ->filterColumn('name', function (Builder $query, $value) {
-                $authorIds = explode(',', $value);
-                $query->where(function (Builder $query) use ($authorIds, $value) {
-                    $query->where('authors.name', 'like', '%' . $value . '%')
-                        ->orWhereIn('authors.id', $authorIds);
-                });
+            ->filterColumn('name', function (Builder $query, $value) use ($request) {
+                if ($request->input('search')['value'] === $value) {
+                    $query->where(function (Builder $query) use ($value) {
+                        $query->where('authors.name', 'like', '%' . $value . '%');
+                    });
+                } else {
+                    $authorIds = explode(',', $value);
+                    $query->where(function (Builder $query) use ($authorIds) {
+                        $query->whereIn('authors.id', $authorIds);
+                    });
+                }
             })
             ->addColumn('conversions_count', function (Author $author) use ($conversionCounts) {
                 return $conversionCounts[$author->id] ?? 0;
@@ -184,186 +190,9 @@ class AuthorController extends Controller
             ->make(true);
     }
 
-    public function dtArticles(Author $author, Request $request, Datatables $datatables)
+    public function dtArticles(Author $author, Request $request, DataTables $datatables, ArticlesDataTable $articlesDataTable)
     {
-        // main articles query to fetch list of all articles with related metadata
-        $articles = Article::selectRaw(implode(',', [
-            "articles.id",
-            "articles.title",
-            "articles.published_at",
-            "articles.url",
-            "articles.pageviews_all",
-            "articles.pageviews_signed_in",
-            "articles.pageviews_subscribers",
-            "articles.timespent_all",
-            "articles.timespent_signed_in",
-            "articles.timespent_subscribers",
-            'timespent_all / pageviews_all as avg_timespent_all',
-            'timespent_signed_in / pageviews_signed_in as avg_timespent_signed_in',
-            'timespent_subscribers / pageviews_subscribers as avg_timespent_subscribers',
-        ]))
-            ->with(['authors', 'sections', 'tags'])
-            ->join('article_author', 'articles.id', '=', 'article_author.article_id')
-            ->leftJoin('article_section', 'articles.id', '=', 'article_section.article_id')
-            ->leftJoin('article_tag', 'articles.id', '=', 'article_tag.article_id')
-            ->where([
-                'article_author.author_id' => $author->id
-            ])
-            ->groupBy(['articles.id', 'articles.title', 'articles.published_at', 'articles.url', "articles.pageviews_all",
-                "articles.pageviews_signed_in", "articles.pageviews_subscribers", "articles.timespent_all",
-                "articles.timespent_signed_in", "articles.timespent_subscribers", 'avg_timespent_all',
-                'avg_timespent_signed_in', 'avg_timespent_subscribers']);
-
-        // filtering query (used as subquery - joins were messing with counts and sums) to fetch matching conversions
-        $conversionsFilter = \DB::table('conversions')
-            ->distinct()
-            ->join('article_author', 'conversions.article_id', '=', 'article_author.article_id')
-            ->join('articles', 'articles.id', '=', 'article_author.article_id')
-            ->where([
-                'article_author.author_id' => $author->id
-            ]);
-        // adding conditions to queries based on request inputs
-        if ($request->input('published_from')) {
-            $publishedFrom = Carbon::parse($request->input('published_from'), $request->input('tz'))->tz('UTC');
-            $articles->where('published_at', '>=', $publishedFrom);
-            $conversionsFilter->where('published_at', '>=', $publishedFrom);
-        }
-        if ($request->input('published_to')) {
-            $publishedTo = Carbon::parse($request->input('published_to'), $request->input('tz'))->tz('UTC');
-            $articles->where('published_at', '<=', $publishedTo);
-            $conversionsFilter->where('published_at', '<=', $publishedTo);
-        }
-        if ($request->input('conversion_from')) {
-            $conversionFrom = Carbon::parse($request->input('conversion_from'), $request->input('tz'))->tz('UTC');
-            $articles->where('paid_at', '>=', $conversionFrom);
-            $conversionsFilter->where('paid_at', '>=', $conversionFrom);
-        }
-        if ($request->input('conversion_to')) {
-            $conversionTo = Carbon::parse($request->input('conversion_to'), $request->input('tz'))->tz('UTC');
-            $articles->where('paid_at', '<=', $conversionTo);
-            $conversionsFilter->where('paid_at', '<=', $conversionTo);
-        }
-
-        // fetch conversions that match the filter
-        $matchedConversions = $conversionsFilter->pluck('conversions.id')->toArray();
-
-        // conversion aggregations that are joined to main query (this is required for orderColumn() to work)
-        $conversionsJoin = \DB::table('conversions')
-            ->selectRaw(implode(',', [
-                'count(*) as conversions_count',
-                'sum(amount) as conversions_sum',
-                'avg(amount) as conversions_avg',
-                'article_id'
-            ]))
-            ->groupBy(['article_id']);
-
-        if ($matchedConversions) {
-            // intentional sprintf, eloquent was using bindings in wrong order in final query
-            $conversionsJoin->whereRaw(sprintf('id IN (%s)', implode(',', $matchedConversions)));
-        } else {
-            // no conversions matched, don't join anything
-            $conversionsJoin->whereRaw('1 = 0');
-        }
-
-        $articles->leftJoin(DB::raw("({$conversionsJoin->toSql()}) as conversions"), 'articles.id', '=', 'conversions.article_id')
-            ->addBinding($conversionsJoin->getBindings());
-
-        // conversion aggregations for displaying (these are grouped also by the currency)
-        $conversionsQuery = \DB::table('conversions')
-            ->selectRaw(implode(',', [
-                'count(*) as count',
-                'sum(amount) as sum',
-                'avg(amount) as avg',
-                'currency',
-                'article_id'
-            ]))
-            ->whereIn('id', $matchedConversions)
-            ->groupBy(['article_id', 'currency']);
-
-        $conversionCount = [];
-        $conversionSum = [];
-        $conversionAvg = [];
-        foreach ($conversionsQuery->get() as $record) {
-            if (!isset($conversionCount[$record->article_id])) {
-                $conversionCount[$record->article_id] = 0;
-            }
-            $conversionCount[$record->article_id] += $record->count;
-            $conversionSum[$record->article_id][$record->currency] = $record->sum;
-            $conversionAvg[$record->article_id][$record->currency] = $record->avg;
-        }
-
-        // final datatable
-        return $datatables->of($articles)
-            ->addColumn('title', function (Article $article) {
-                return Html::link(route('articles.show', ['article' => $article->id]), $article->title);
-            })
-            ->addColumn('conversions_count', function (Article $article) use ($conversionCount) {
-                return $conversionCount[$article->id] ?? 0;
-            })
-            ->addColumn('conversions_sum', function (Article $article) use ($conversionSum) {
-                if (!isset($conversionSum[$article->id])) {
-                    return [0];
-                }
-                $amounts = null;
-                foreach ($conversionSum[$article->id] as $currency => $c) {
-                    $c = round($c, 2);
-                    $amounts[] = "{$c} {$currency}";
-                }
-                return $amounts ?? [0];
-            })
-            ->addColumn('conversions_avg', function (Article $article) use ($conversionAvg) {
-                if (!isset($conversionAvg[$article->id])) {
-                    return [0];
-                }
-                $amounts = null;
-                foreach ($conversionAvg[$article->id] as $currency => $c) {
-                    $c = round($c, 2);
-                    $amounts[] = "{$c} {$currency}";
-                }
-                return $amounts ?? [0];
-            })
-            ->filterColumn('sections[, ].name', function (Builder $query, $value) {
-                $values = explode(',', $value);
-                $filterQuery = \DB::table('sections')
-                    ->join('article_section', 'articles.id', '=', 'article_section.article_id', 'left')
-                    ->whereIn('article_section.author_id', $values);
-                $articleIds = $filterQuery->pluck('articles.id')->toArray();
-                $query->whereIn('articles.id', $articleIds);
-            })
-            ->filterColumn('tags[, ].name', function (Builder $query, $value) {
-                $values = explode(',', $value);
-                $filterQuery = \DB::table('tags')
-                    ->join('article_tag', 'articles.id', '=', 'article_tag.article_id', 'left')
-                    ->whereIn('article_tag.author_id', $values);
-                $articleIds = $filterQuery->pluck('articles.id')->toArray();
-                $query->whereIn('articles.id', $articleIds);
-            })
-            ->orderColumn('avg_sum', 'timespent_sum / pageviews_all $1')
-            ->orderColumn('pageviews_all', 'pageviews_all $1')
-            ->orderColumn('timespent_sum', 'timespent_sum $1')
-            ->orderColumn('conversions_count', 'conversions_count $1')
-            ->orderColumn('conversions_sum', 'conversions_sum $1')
-            ->orderColumn('conversions_avg', 'conversions_avg $1')
-            ->make(true);
-    }
-
-    public function topAuthors(TopSearchRequest $request, TopSearch $topSearch)
-    {
-        $limit = $request->json('limit');
-        $timeFrom = Carbon::parse($request->json('from'));
-
-        $sections = $request->json('sections');
-        $sectionValueType = null;
-        $sectionValues = null;
-        if (isset($sections['external_id'])) {
-            $sectionValueType = 'external_id';
-            $sectionValues = $sections['external_id'];
-        } elseif (isset($sections['name'])) {
-            $sectionValueType = 'name';
-            $sectionValues = $sections['name'];
-        }
-        $contentType = $request->json('content_type');
-
-        return response()->json($topSearch->topAuthors($timeFrom, $limit, $sectionValueType, $sectionValues, $contentType));
+        $articlesDataTable->setAuthor($author);
+        return $articlesDataTable->getDataTable($request, $datatables);
     }
 }

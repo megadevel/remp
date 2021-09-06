@@ -2,23 +2,19 @@
 
 namespace App;
 
+use App\Model\BaseModel;
+use Illuminate\Database\Eloquent\Factories\HasFactory;
 use App\Model\ConversionCommerceEvent;
 use App\Model\ConversionGeneralEvent;
 use App\Model\ConversionPageviewEvent;
-use DB;
-use Illuminate\Database\Eloquent\Model;
+use App\Model\ConversionSource;
 use Illuminate\Database\Eloquent\ModelNotFoundException;
 use Illuminate\Support\Carbon;
 
-/**
- * Class Conversion
- *
- * @property string articleExternalId
- *
- * @package App
- */
-class Conversion extends Model
+class Conversion extends BaseModel
 {
+    use HasFactory;
+
     protected $fillable = [
         'article_external_id',
         'transaction_id',
@@ -34,7 +30,8 @@ class Conversion extends Model
     ];
 
     protected $casts = [
-        'events_aggregated' => 'boolean'
+        'events_aggregated' => 'boolean',
+        'source_processed' => 'boolean',
     ];
 
     public function article()
@@ -57,6 +54,11 @@ class Conversion extends Model
         return $this->hasMany(ConversionGeneralEvent::class);
     }
 
+    public function conversionSources()
+    {
+        return $this->hasMany(ConversionSource::class);
+    }
+
     public function setArticleExternalIdAttribute($articleExternalId)
     {
         $article = Article::select()->where([
@@ -75,5 +77,13 @@ class Conversion extends Model
             return;
         }
         $this->attributes['paid_at'] = new Carbon($value);
+    }
+
+    public static function getAggregatedConversionsWithoutSource()
+    {
+        return Conversion::select()
+            ->where('events_aggregated', true)
+            ->where('source_processed', false)
+            ->get();
     }
 }

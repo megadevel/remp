@@ -200,6 +200,44 @@
 
                                                :adminPreview="adminPreview"
         ></overlay-two-buttons-signature-preview>
+        <newsletter-rectangle-preview v-if="template === 'newsletter_rectangle'"
+                                      :alignmentOptions="alignmentOptions"
+                                      :positionOptions="positionOptions"
+                                      :show="visible"
+                                      :uuid="uuid"
+                                      :campaignUuid="campaignUuid"
+                                      :variantUuid="variantUuid"
+                                      :forcedPosition="forcedPosition"
+
+                                      :newsletterId="newsletterRectangleTemplate.newsletterId"
+                                      :btnSubmit="newsletterRectangleTemplate.btnSubmit"
+                                      :title="newsletterRectangleTemplate.title"
+                                      :text="newsletterRectangleTemplate.text"
+                                      :success="newsletterRectangleTemplate.success"
+                                      :failure="newsletterRectangleTemplate.failure"
+                                      :terms="newsletterRectangleTemplate.terms"
+                                      :textColor="newsletterRectangleTemplate.textColor"
+                                      :backgroundColor="newsletterRectangleTemplate.backgroundColor"
+                                      :buttonBackgroundColor="newsletterRectangleTemplate.buttonBackgroundColor"
+                                      :buttonTextColor="newsletterRectangleTemplate.buttonTextColor"
+                                      :width="newsletterRectangleTemplate.width"
+                                      :height="newsletterRectangleTemplate.height"
+
+                                      :endpoint="newsletterRectangleTemplate.endpoint"
+                                      :useXhr="newsletterRectangleTemplate.useXhr"
+                                      :requestBody="newsletterRectangleTemplate.requestBody"
+                                      :requestHeaders="newsletterRectangleTemplate.requestHeaders"
+                                      :paramsTransposition="newsletterRectangleTemplate.paramsTransposition"
+                                      :paramsExtra="newsletterRectangleTemplate.paramsExtra"
+
+                                      :position="position"
+                                      :offsetVertical="offsetVertical"
+                                      :offsetHorizontal="offsetHorizontal"
+                                      :closeable="closeable"
+                                      :closeText="closeText"
+                                      :transition="transition"
+                                      :displayType="displayType"
+        ></newsletter-rectangle-preview>
     </div>
 </template>
 
@@ -213,8 +251,9 @@
     import OverlayRectanglePreview from "./previews/OverlayRectangle";
     import HtmlOverlayPreview from "./previews/HtmlOverlay";
     import OverlayTwoButtonsSignaturePreview from "./previews/OverlayTwoButtonsSignature";
+    import NewsletterRectanglePreview from "./previews/NewsletterRectangle";
 
-    import lib from "remp/js/remplib.js";
+    import lib from "@remp/js-commons/js/remplib.js";
 
     const props = [
         "name",
@@ -246,6 +285,7 @@
         "overlayRectangleTemplate",
         "htmlOverlayTemplate",
         "overlayTwoButtonsSignatureTemplate",
+        "newsletterRectangleTemplate",
 
         "alignmentOptions",
         "dimensionOptions",
@@ -270,7 +310,8 @@
             ShortMessagePreview,
             OverlayRectanglePreview,
             HtmlOverlayPreview,
-            OverlayTwoButtonsSignaturePreview
+            OverlayTwoButtonsSignaturePreview,
+            NewsletterRectanglePreview,
         },
         name: 'banner-preview',
         props: props,
@@ -293,7 +334,7 @@
             let cssIncludes = (this.cssIncludes) ? this.cssIncludes.filter(cssInclude => cssInclude) : [];
             if (cssIncludes && cssIncludes.length > 0) {
                 for (let ii = 0; ii < cssIncludes.length; ii++) {
-                    lib.loadStyle(cssIncludes[ii]);
+                    lib.loadStyle(this.injectVars(cssIncludes[ii]));
                 }
             }
 
@@ -301,7 +342,7 @@
             if (jsIncludes && jsIncludes.length > 0) {
                 let loadedScriptsCount = 0;
                 jsIncludes.forEach((jsInclude) => {
-                    lib.loadScript(jsInclude, () => {
+                    lib.loadScript(this.injectVars(jsInclude), () => {
                         loadedScriptsCount += 1;
                         if (loadedScriptsCount === jsIncludes.length) {
                             this.runCustomJavascript(this.js);
@@ -309,7 +350,7 @@
                     });
                 });
             } else {
-                this.runCustomJavascript(this.js);
+                this.runCustomJavascript(this.injectVars(this.js));
             }
         },
         data: () => ({
@@ -370,16 +411,16 @@
             },
             addUrlParams: function(url, linkParams) {
                 let separator = url.indexOf("?") === -1 ? "?" : "&";
-                url =  url + separator + "utm_source=remp_campaign" +
-                    "&utm_medium=" + encodeURIComponent(this.displayType);
+                url =  url + separator + "rtm_source=remp_campaign" +
+                    "&rtm_medium=" + encodeURIComponent(this.displayType);
                 if (this.campaignUuid) {
-                    url += "&utm_campaign=" + encodeURIComponent(this.campaignUuid);
+                    url += "&rtm_campaign=" + encodeURIComponent(this.campaignUuid);
                 }
                 if (this.uuid) {
-                    url += "&utm_content=" + encodeURIComponent(this.uuid);
+                    url += "&rtm_content=" + encodeURIComponent(this.uuid);
                 }
                 if (this.variantUuid) {
-                    url += "&banner_variant=" + encodeURIComponent(this.variantUuid);
+                    url += "&rtm_variant=" + encodeURIComponent(this.variantUuid);
                 }
 
                 if (this.urlParams) {
@@ -401,17 +442,21 @@
                 return url;
             },
             injectVars: function(str) {
-                if (!remplib || !remplib.campaign) {
-                    return str;
-                }
                 let re = /\{\{\s?(.*?)\s?\}\}/g;
                 let match;
 
                 while (match = re.exec(str)) {
+                    re.lastIndex = 0;
                     let replRegex = new RegExp(match[0], "g");
                     let replVal = '';
-                    if (remplib.campaign.variables && remplib.campaign.variables.hasOwnProperty(match[1])) {
+                    if (remplib &&
+                        remplib.campaign &&
+                        remplib.campaign.variables &&
+                        remplib.campaign.variables.hasOwnProperty(match[1])
+                    ) {
                         replVal = remplib.campaign.variables[match[1]].value()
+                    } else if (this.variables && this.variables.hasOwnProperty(match[1])) {
+                        replVal = this.variables[match[1]];
                     } else {
                         throw EvalError("cannot render banner, variable [" + match[1] + "] is missing");
                     }
@@ -420,19 +465,19 @@
                 return str;
             },
             closed: function() {
-				this.visible = false;
-				this.$parent.$emit('values-changed', [
+                this.visible = false;
+                this.$parent.$emit('values-changed', [
                     {key: "show", val: false}
                 ]);
                 if (this.manualEventsTracking || this.closeTracked) {
                     return true;
                 }
                 this.trackEvent("banner", "close", null, null, {
-                    "utm_source": "remp_campaign",
-                    "utm_medium": this.displayType,
-                    "utm_campaign": this.campaignUuid,
-                    "utm_content": this.uuid,
-                    "banner_variant": this.variantUuid
+                    "rtm_source": "remp_campaign",
+                    "rtm_medium": this.displayType,
+                    "rtm_campaign": this.campaignUuid,
+                    "rtm_content": this.uuid,
+                    "rtm_variant": this.variantUuid
                 });
                 this.closeTracked = true;
             },
@@ -441,11 +486,11 @@
                     return true;
                 }
                 this.trackEvent("banner", "click", null, null, {
-                    "utm_source": "remp_campaign",
-                    "utm_medium": this.displayType,
-                    "utm_campaign": this.campaignUuid,
-                    "utm_content": this.uuid,
-                    "banner_variant": this.variantUuid
+                    "rtm_source": "remp_campaign",
+                    "rtm_medium": this.displayType,
+                    "rtm_campaign": this.campaignUuid,
+                    "rtm_content": this.uuid,
+                    "rtm_variant": this.variantUuid
                 });
                 this.clickTracked = true;
                 if (hideBanner) {
@@ -474,27 +519,32 @@
             runCustomJavascript: function (js) {
                 let that = this;
                 this.$nextTick(() => {
-                    setTimeout(function() {
-                        try {
-                            // Evaluating JS code using Function with passed params object
-                            // https://stackoverflow.com/questions/49125059/how-to-pass-parameters-to-an-eval-based-function-injavascript
-                            let body = 'function(params) { ' + js + ' }';
-                            let wrap = s => "{ return " + body + " };";
-                            let func = new Function(wrap(body));
-                            func.call(null).call(null, that.paramsForCustomJavascript());
-                        } catch(err) {
-                            console.warn("unable to execute custom banner JS:", js);
-                            console.warn(err);
-                        }
-                    }, 0);
+                      try {
+                          // Evaluating JS code using Function with passed params object
+                          // https://stackoverflow.com/questions/49125059/how-to-pass-parameters-to-an-eval-based-function-injavascript
+                          let body = 'function(params) { ' + that.injectVars(js) + ' }';
+                          let wrap = s => "{ return " + body + " };";
+                          let func = new Function(wrap(body));
+                          func.call(null).call(null, that.paramsForCustomJavascript());
+                      } catch(err) {
+                          console.warn("unable to execute custom banner JS:", js);
+                          console.warn(err);
+                      }
                 }, this)
             },
             paramsForCustomJavascript: function () {
                 return {
+                    "rtmSource": "remp_campaign",
+                    "rtmMedium": this.displayType,
+                    "rtmCampaign": this.campaignUuid,
+                    "rtmContent": this.uuid,
+                    "rtmVariant": this.variantUuid,
+                    // kept for backward-compatibility reasons
+                    "utmSource": "remp_campaign",
                     "utmMedium": this.displayType,
                     "utmCampaign": this.campaignUuid,
                     "utmContent": this.uuid,
-                    "bannerVariant": this.variantUuid
+                    "bannerVariant": this.variantUuid,
                 }
             }
         }

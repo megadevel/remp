@@ -42,20 +42,20 @@
                 'conversions_count' => [
                     'header' => 'conversions',
                     'searchable' => false,
-                    'orderSequence' => ['desc'],
+                    'orderSequence' => ['desc', 'asc'],
                     'priority' => 2,
                     'className' => 'text-right',
                 ],
                 'conversions_rate' => [
                     'searchable' => false,
                     'header' => 'conversions rate',
-                    'orderSequence' => ['desc'],
+                    'orderSequence' => ['desc', 'asc'],
                     'priority' => 2,
                     'className' => 'text-right',
                 ],
                 'amount' => [
                     'header' => 'amount',
-                    'orderSequence' => ['desc'],
+                    'orderSequence' => ['desc', 'asc'],
                     'render' => 'array',
                     'priority' => 1,
                     'searchable' => false,
@@ -64,10 +64,17 @@
                 'average' => [
                     'header' => 'average',
                     'render' => 'array',
-                    'orderSequence' => ['desc'],
+                    'orderSequence' => ['desc', 'asc'],
                     'priority' => 2,
                     'searchable' => false,
                     'className' => 'text-right',
+                ],
+                'content_type' => [
+                    'header' => 'Type',
+                    'orderable' => false,
+                    'filter' => $contentTypes,
+                    'priority' => 2,
+                    'visible' => count($contentTypes) > 1,
                 ],
                 'authors' => [
                     'header' => 'authors',

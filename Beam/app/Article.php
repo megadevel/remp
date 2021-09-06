@@ -2,11 +2,14 @@
 
 namespace App;
 
+use App\Model\BaseModel;
+use App\Model\ConversionSource;
+use Illuminate\Database\Eloquent\Factories\HasFactory;
 use App\Helpers\Journal\JournalHelpers;
+use App\Helpers\Misc;
 use App\Model\ArticleTitle;
 use App\Model\Config\ConversionRateConfig;
 use App\Model\Tag;
-use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\DB;
@@ -16,8 +19,10 @@ use Spatie\Searchable\Searchable;
 use Spatie\Searchable\SearchResult;
 use Yadakhov\InsertOnDuplicateKey;
 
-class Article extends Model implements Searchable
+class Article extends BaseModel implements Searchable
 {
+    use HasFactory;
+
     use InsertOnDuplicateKey;
 
     private const DEFAULT_TITLE_VARIANT = 'default';
@@ -83,6 +88,11 @@ class Article extends Model implements Searchable
     public function conversions()
     {
         return $this->hasMany(Conversion::class);
+    }
+
+    public function conversionSources()
+    {
+        return $this->hasManyThrough(ConversionSource::class, Conversion::class);
     }
 
     public function pageviews()
@@ -251,6 +261,23 @@ SQL;
         return count($this->variants_count['title']) > 1;
     }
 
+    /**
+     * conversion_sources
+     * @return Collection
+     */
+    public function getConversionSources(): Collection
+    {
+        return $this
+            ->conversions()
+            ->with('conversionSources')
+            ->get()
+            ->pluck('conversionSources')
+            ->filter(function ($conversionSource) {
+                return $conversionSource->isNotEmpty();
+            })
+            ->flatten();
+    }
+
     // Mutators
     public function setPublishedAtAttribute($value)
     {
@@ -334,6 +361,14 @@ SQL;
         return $query;
     }
 
+    public function scopeIgnoreContentTypes(Builder $query, array $contentTypes)
+    {
+        if ($contentTypes) {
+            $query->whereNotIn('content_type', $contentTypes);
+        }
+        return $query;
+    }
+
     public function scopePublishedBetween(Builder $query, Carbon $from = null, Carbon $to = null)
     {
         if ($from) {
@@ -345,8 +380,13 @@ SQL;
         return $query;
     }
 
+
     /**
      * Update or create record in case it doesn't exist.
+     *
+     * @param array $values
+     *
+     * @return Article
      */
     public static function upsert(array $values): Article
     {
@@ -355,6 +395,10 @@ SQL;
         $updateKeys[] = 'updated_at';
         // Timestamp values are not inserted automatically
         $attributes['updated_at'] = $attributes['created_at'] = Carbon::now()->toDateTimeString();
+        if (isset($attributes['published_at'])) {
+            $attributes['published_at'] = Misc::dateToSql($attributes['published_at']);
+        }
+
         static::insertOnDuplicateKey($attributes, $updateKeys);
 
         return static::where('external_id', $values['external_id'])->first();

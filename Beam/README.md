@@ -79,17 +79,17 @@ For dashboard to work correctly, you need to:
 * Push article metadata to Beam via [article tracking API](#post-apiarticlesupsert)
 * Enable *timespent* tracking within this snippet (`rempConfig.tracker.timeSpent = { "enabled": true}` ).
 
-Note: *Timespent* tracking is not mandatory dashboard can utilize regular pageview data instead to calculate number of concurrents. If you don't plan to track timespent, please see [this Telegraf configuration options](https://github.com/remp2020/remp/blob/master/Docker/telegraf/telegraf.conf#L78) so you can switch to pageview-based concurrents instead.
+Note: *Timespent* tracking is not mandatory. Dashboard can utilize regular pageview data instead to calculate number of concurrents. If you don't plan to track timespent, please see [this Telegraf configuration options](https://github.com/remp2020/remp/blob/master/Docker/telegraf/telegraf.conf#L78) so you can switch to pageview-based concurrents instead.
 
 Dashboard allows you to display detail of each article with pageview-related chart containing histogram of visits
 split by traffic source medium (same as in the main dashboard) and also displays article-related events.
 
 ###### Source medium labels
 
-Optionally, you can configure labels for source mediums of your pageviews. 
+Optionally, you can configure labels for source mediums of your pageviews.
 Labels will be shown in dashboard traffic (and article detail traffic) instead of real tracked values.
 
-Currently, you can do it directly by editing database table `referer_medium_labels`.   
+Currently, you can do it directly by editing database table `referer_medium_labels`.
 
 ##### Accounts
 
@@ -121,7 +121,7 @@ a segment with some specific condition, there should be at least one event in th
 
 If some of your readers are interested only in specific of authors, Beam can identify such users and generate
 *authors segments*. Each author segment contain users, which are returning back and reading mostly the author
-that the segment belongs to. 
+that the segment belongs to.
 
 As calculation of these segments it's computation intensive operation, author segments are computed on backend
 by running `php artisan segments:compute-author-segments`.
@@ -190,7 +190,7 @@ experimental feature, the APIs might change in the future and it's not recommend
 ##### Newsletters
 
 When Beam is configured to work with Mailer (`REMP_MAILER_ADDR` is populated), Beam allows you to configure automatic
-generation of newsletters. Content of this email would be based on articles selected by Beam automatically also with the 
+generation of newsletters. Content of this email would be based on articles selected by Beam automatically also with the
 option to personalize the email for each user separately.
 
 When you want to add newsletter, following is required:
@@ -214,7 +214,7 @@ is subscribed to receive this email or not. You should select which newsletter t
 * *Criterion.* What should be used as a criteria for selecting (and ordering) articles for newsletter (e.g. number
 of pageviews, amount of time spent reading the article)
 * *Timespan.* What should be the time range for selected *criterion*. This should be similar or equal to your recurrence
-so you can send best articles in the last 24 hours (timespan) every 24 hours (recurrence). 
+so you can send best articles in the last 24 hours (timespan) every 24 hours (recurrence).
 * *How many articles.* How many articles should be selected into the email.
 * *Personalized content.* Whether all users should receive the same newsletter or whether everyone should receive newsletter
 with articles they haven't read yet.
@@ -273,7 +273,7 @@ differentiate where your subscribers are coming from and where you non-paying us
 
 * *Devices.* Section allows you to see hardware-related statistics of your visitors (with visit counts) based on
 browsers and specific devices that were extracted from user agents of your visitors.
-* *Sources.* Section allows you to see referer-based statistics and see absolute numbers for given source (host) or 
+* *Sources.* Section allows you to see referer-based statistics and see absolute numbers for given source (host) or
 medium (e.g. search, internal traffic, etc.)
 
 ### API Documentation
@@ -289,7 +289,7 @@ before executing the examples.
 All examples use `XXX` as a default value for authorization token, please replace it with the
 real token API token that can be acquired in the REMP SSO.
 
-All requests should contain (and be compliant) with the follow HTTP headers. 
+All requests should contain (and be compliant) with the follow HTTP headers.
 
 ```
 Content-Type: application/json
@@ -301,10 +301,10 @@ API responses can contain following HTTP codes:
 
 | Value | Description |
 | --- | --- |
-| 200 OK | Successful response, default value | 
-| 400 Bad Request | Invalid request (missing required parameters) | 
-| 403 Forbidden | The authorization failed (provided token was not valid) | 
-| 404 Not found | Referenced resource wasn't found | 
+| 200 OK | Successful response, default value |
+| 400 Bad Request | Invalid request (missing required parameters) |
+| 403 Forbidden | The authorization failed (provided token was not valid) |
+| 404 Not found | Referenced resource wasn't found |
 
 If possible, the response includes `application/json` encoded payload with message explaining
 the error further.
@@ -348,7 +348,7 @@ data related to Beam (e.g. A/B testing of titles).
                 "Opinions" // Name of the section
             ],
             "published_at": "2018-06-05T06:03:05Z" // RFC3339 formatted datetime
-        }  
+        }
     ]
 }
 ```
@@ -368,25 +368,25 @@ curl -X POST \
     "articles": [
         {
             "external_id": "74565321",
-            "property_uuid": "1a8feb16-3e30-4f9b-bf74-20037ea8505a", 
+            "property_uuid": "1a8feb16-3e30-4f9b-bf74-20037ea8505a",
             "title": "10 things you need to know",
             "titles": {
                 "A": "10 things you need to know",
-                "B": "10 things everyone hides from you" 
+                "B": "10 things everyone hides from you"
             },
             "url": "http://example.com/74565321",
-            "content_type": "blog", 
-            "authors": [ 
-                "Jon Snow" 
+            "content_type": "blog",
+            "authors": [
+                "Jon Snow"
             ],
             "sections": [
-                "Opinions" 
+                "Opinions"
             ],
             "tags": [
-                "Elections 2020" 
+                "Elections 2020"
             ],
             "published_at": "2018-06-05T06:03:05Z"
-        }  
+        }
     ]
 }'
 ```
@@ -482,7 +482,7 @@ $response = file_get_contents("http://beam.remp.press/api/articles/upsert ", fal
                     "created_at": "2019-05-17 11:43:04",
                     "updated_at": "2019-05-17 11:43:04"
                 }
-            ],            
+            ],
         }
     ]
 }
@@ -535,11 +535,17 @@ Your CMS should track all article-related changes to Beam so Beam knows about th
             "tags": [ // Optional
                 {
                     "external_id": "1", // String; Required; External id of the tag
-                    "name": "Elections 2020" // String; Required; Name of the tag
+                    "name": "Elections 2020", // String; Required; Name of the tag,
+                    "categories": [ // Optional
+                        {
+                            "external_id": "1", // String; Required; External id of the tag category
+                            "name": "USA" // String; Required; Name of the tag category
+                        }
+                    ]
                 }
             ],
             "published_at": "2018-06-05T06:03:05Z" // RFC3339 formatted datetime
-        }  
+        }
     ]
 }
 ```
@@ -559,11 +565,11 @@ curl -X POST \
     "articles": [
         {
             "external_id": "74565321",
-            "property_uuid": "1a8feb16-3e30-4f9b-bf74-20037ea8505a", 
+            "property_uuid": "1a8feb16-3e30-4f9b-bf74-20037ea8505a",
             "title": "10 things you need to know",
             "titles": {
                 "A": "10 things you need to know",
-                "B": "10 things everyone hides from you" 
+                "B": "10 things everyone hides from you"
             },
             "url": "http://example.com/74565321",
             "content_type": "blog",
@@ -582,11 +588,17 @@ curl -X POST \
             "tags": [
                 {
                     "external_id": "1",
-                    "name": "Elections 2020" 
+                    "name": "Elections 2020",
+                    "categories": [
+                        {
+                            "external_id": "1",
+                            "name": "USA"
+                        }
+                    ]
                 }
             ],
             "published_at": "2018-06-05T06:03:05Z"
-        }  
+        }
     ]
 }'
 ```
@@ -624,7 +636,13 @@ $payload = [
             "tags" => [
                 [
                     "external_id" => "1",
-                    "name" => "Elections 2020" 
+                    "name" => "Elections 2020" ,
+                    "categories" => [
+                        [
+                            "external_id" => "1",
+                            "name" => "USA"
+                        ]
+                    ]
                 ]
             ],
             "published_at" => "2018-06-05T06:03:05Z",
@@ -692,9 +710,15 @@ $response = file_get_contents("http://beam.remp.press/api/v2/articles/upsert ", 
                     "external_id": "1",
                     "name": "Elections 2020",
                     "created_at": "2019-05-17 11:43:04",
-                    "updated_at": "2019-05-17 11:43:04"
+                    "updated_at": "2019-05-17 11:43:04",
+                    "tag_categories": [
+                        {
+                            "external_id": "1",
+                            "name": "USA"
+                        }
+                    ]
                 }
-            ],            
+            ],
         }
     ]
 }
@@ -726,7 +750,7 @@ tracked via Tracker API (see `/track/commerce` definition in Tracker's `swagger.
         {
             "article_external_id": "74565321", // String; Required; ID of article in your CMS,
             "transaction_id": "8743320112", // String; Required; ID of transaction (unique for each transaction),
-            "amount": 17.99, // Numeric; Required; Nominal amount of the transaction, e.g. 10.0 
+            "amount": 17.99, // Numeric; Required; Nominal amount of the transaction, e.g. 10.0
             "currency": "EUR", // String; Required; Currency of the transaction, e.g. ",EUR"
             "paid_at": "2018-06-05T12:03:05Z", // String; Required; RFC3339 formatted datetime with date of the transaction,
             "user_id": "74412" // Optional; Identifier of user who made a transaction
@@ -822,7 +846,7 @@ $response = file_get_contents("http://beam.remp.press/api/conversions/upsert ", 
 ##### POST `api/articles/top`
 
 Beam admin provides statistics about article performance. This endpoint return top articles by pageviews.
-You can filter articles by section and time of pageview.
+You can filter articles by content type, sections, authors, tags or tag categories.
 
 ##### *Headers:*
 
@@ -836,12 +860,24 @@ You can filter articles by section and time of pageview.
 
 ```json5
 {
-	"from": "2020-08-10T08:09:18+00:00", // RFC3339-based start time from which to take pageviews to this today 
+	"from": "2020-08-10T08:09:18+00:00", // RFC3339-based start time from which to take pageviews to this today
 	"limit": 3, // limit how many top articles this endpoint returns
 	"content_type": "article", // String; OPTIONAL; filters articles by content_type
 	"sections": { // OPTIONAL; filters from which sections take articles (use either external_id or name arrays, not both)
-		"external_id": ["Section external id"], // String; section external IDs 
-		"name": ["Section title"] // String; section external_id
+		"external_id": ["Section external id"], // String; section external IDs
+		"name": ["Section title"] // String; section names
+	},
+	"authors": { // OPTIONAL; filters from which authors take articles (use either external_id or name arrays, not both)
+		"external_id": ["author external id"], // String; author external IDs
+		"name": ["author name"] // String; author names
+	},
+	"tags": { // OPTIONAL; filters articles with tags (use either external_id or name arrays, not both)
+		"external_id": ["tag external id"], // String; tag external IDs
+		"name": ["tag name"] // String; tag names
+	},
+	"tag_categories": { // OPTIONAL; filters articles with tag categories (use either external_id or name arrays, not both)
+		"external_id": ["tag category external id"], // String; tag category external IDs
+		"name": ["tag category name"] // String; tag category names
 	}
 }
 ```
@@ -862,6 +898,15 @@ curl --location --request POST 'http://beam.remp.press/api/articles/top' \
 	"content_type": "article",
 	"sections": {
 		"external_id": ["1"]
+	},
+	"authors": {
+		"external_id": ["123"]
+	},
+	"tags": {
+		"external_id": ["10"]
+	},
+	"tag_categories": {
+		"external_id": ["1"]
 	}
 }'
 ```
@@ -877,7 +922,16 @@ $payload = [
 	"limit" => 3,
 	"content_type" => "article",
 	"sections" => [
-		"Blog"
+		"name" => ["Blog"]
+	],
+	"authors" => [
+		"name" => ["John Doe"]
+	],
+	"tags" => [
+		"name" => ["News"]
+	],
+	"tag_categories" => [
+		"name" => ["Europe"]
 	]
 ];
 $jsonPayload = json_encode($payload);
@@ -919,10 +973,12 @@ $response = file_get_contents("http://beam.remp.press/api/articles/top", false, 
 
 ---
 
-##### POST `api/authors/top`
+##### POST `api/v2/articles/top`
 
-Beam admin provides statistics about author performance. This endpoint return top authors by pageviews.
-You can filter authors by time of pageview.
+Beam admin provides statistics about article performance. This endpoint return top articles by pageviews.
+You can filter articles by content type, sections, authors, tags or tag categories.
+
+You can combine multiple filters for each filter category. Filters in and between categories are joined with `AND`, values in filter are joined with `OR`.
 
 ##### *Headers:*
 
@@ -936,12 +992,151 @@ You can filter authors by time of pageview.
 
 ```json5
 {
-	"from": "2020-08-10T08:14:09+00:00", // RFC3339-based start datetime from which to take pageviews to this today 
+	"from": "2020-08-10T08:09:18+00:00", // RFC3339-based start time from which to take pageviews to this today 
+	"limit": 3, // limit how many top articles this endpoint returns
+	"content_type": "article", // String; OPTIONAL; filters articles by content_type
+	"sections": [ // OPTIONAL; filters from which sections take articles (use either external_id or name arrays, not both); filters joined with AND
+		{"external_ids": ["Section external ids"]}, // String; section external IDs; values joined with OR
+		{"names": ["Section titles"]} // String; section names; joined with OR; values joined with OR
+	],
+	"authors": [ // OPTIONAL; filters from which authors take articles (use either external_id or name arrays, not both); filters joined with AND
+		{"external_ids": ["author external ids"]}, // String; author external IDs; values joined with OR
+		{"names": ["author names"]} // String; author names; joined with OR; values joined with OR
+	],
+	"tags": [ // OPTIONAL; filters articles with tags (use either external_id or name arrays, not both); filters joined with AND
+		{"external_ids": ["tag external ids"]}, // String; tag external IDs; values joined with OR
+		{"names": ["tag names"]} // String; tag names; values joined with OR
+	],
+	"tag_categories": [ // OPTIONAL; filters articles with tag categories (use either external_id or name arrays, not both); filters joined with AND
+		{"external_ids": ["tag category external ids"]}, // String; tag category external IDs; values joined with OR
+		{"names": ["tag category names"]} // String; tag category names; values joined with OR
+	]
+}
+```
+
+##### *Examples*:
+
+<details>
+<summary>curl</summary>
+
+```shell
+curl --location --request POST 'http://beam.remp.press/api/v2/articles/top' \
+--header 'Content-Type: application/json' \
+--header 'Accept: application/json' \
+--header 'Authorization: Bearer XXX' \
+--data-raw '{
+	"from": "2020-08-10T08:09:18+00:00",
+	"limit": 3,
+	"content_type": "article",
+	"sections": [
+		{"external_ids": ["1", "2"]},
+		{"names": ["World"]}
+	],
+	"authors": [
+		{"external_ids": ["123"]}
+	],
+	"tags": [
+		{"external_ids": ["10"]}
+	],
+	"tag_categories": [
+		{"external_ids": ["1"]}
+	]
+}'
+```
+
+</details>
+
+<details>
+<summary>raw PHP</summary>
+
+```php
+$payload = [
+	"from" => "2020-08-10T08:09:18+00:00",
+	"limit" => 3,
+	"content_type" => "article",
+	"sections" => [
+		["names" => ["Blog"]]
+	],
+	"authors" => [
+		["names" => ["John Doe"]]
+	],
+	"tags" => [
+		["names" => ["News"]]
+	],
+	"tag_categories" => [
+		["names" => ["Europe"]]
+	]
+];
+$jsonPayload = json_encode($payload);
+$context = stream_context_create([
+        'http' => [
+            'method' => 'POST',
+            'header' => "Content-Type: type=application/json\r\n"
+                . "Accept: application/json\r\n"
+                . "Content-Length: " . strlen($jsonPayload) . "\r\n"
+                . "Authorization: Bearer XXX",
+            'content' => $jsonPayload,
+        ]
+    ]
+);
+$response = file_get_contents("http://beam.remp.press/api/v2/articles/top", false, $context);
+// process response (raw JSON string)
+```
+
+</details>
+
+##### *Response:*
+
+```json5
+[
+    {
+        "external_id": "1411843",
+        "pageviews": 274
+    },
+    {
+        "external_id": "1443988",
+        "pageviews": 150
+    },
+    {
+        "external_id": "1362607",
+        "pageviews": 45
+    }
+]
+```
+
+---
+
+##### POST `api/authors/top`
+
+Beam admin provides statistics about author performance. This endpoint return top authors by pageviews.
+You can filter authors by content type, sections, tags or tag categories.
+
+##### *Headers:*
+
+| Name | Value | Required | Description |
+| --- |---| --- | --- |
+| Authorization | Bearer *String* | yes | API token. |
+| Content-Type | application/json | yes |  |
+| Accept | application/json | yes |  |
+
+##### *Body:*
+
+```json5
+{
+	"from": "2020-08-10T08:14:09+00:00", // RFC3339-based start datetime from which to take pageviews to this today
 	"limit": 3, // limit how many top authors this endpoint returns
 	"content_type": "article", // String; OPTIONAL; filters articles by content_type
 	"sections": { // OPTIONAL; filters from which sections take articles (use either external_id or name arrays, not both)
-		"external_id": ["Section external id"], // String; section external IDs 
-		"name": ["Section title"] // String; section external_id
+		"external_id": ["Section external id"], // String; section external IDs
+		"name": ["Section title"] // String; section names
+	},
+	"tags": { // OPTIONAL; filters articles with tags (use either external_id or name arrays, not both)
+		"external_id": ["Tag external id"], // String; tag external IDs
+		"name": ["Tag title"] // String; tag names
+	},
+	"tag_categories": { // OPTIONAL; filters articles with tag categories (use either external_id or name arrays, not both)
+		"external_id": ["tag category external id"], // String; tag category external IDs
+		"name": ["tag category name"] // String; tag category names
 	}
 }
 ```
@@ -962,6 +1157,12 @@ curl --location --request POST 'http://beam.remp.press/api/authors/top' \
 	"content_type": "article",
 	"sections": {
 	    "external_id": ["22"]
+	},
+	"tags": {
+	    "external_id": ["10"]
+	},
+	"tag_categories": {
+		"external_id": ["1"]
 	}
 }'
 ```
@@ -975,7 +1176,16 @@ curl --location --request POST 'http://beam.remp.press/api/authors/top' \
 $payload = [
 	"from" => "2020-08-10T08:14:09+00:00",
 	"limit" => 3,
-	"content_type" => "article"
+	"content_type" => "article",
+	"sections" => [
+		"name" => ["Blog"]
+	],
+	"tags" => [
+		"name" => ["News"]
+	],
+	"tag_categories" => [
+		"name" => ["Europe"]
+	]
 ];
 $jsonPayload = json_encode($payload);
 $context = stream_context_create([
@@ -1009,10 +1219,12 @@ $response = file_get_contents("http://beam.remp.press/api/authors/top", false, $
 
 ---
 
-##### POST `api/tags/top`
+##### POST `api/v2/authors/top`
 
-Beam admin provides statistics about tag performance. This endpoint return top post tags by pageviews.
-You can filter tags by time of pageview.
+Beam admin provides statistics about author performance. This endpoint return top authors by pageviews.
+You can filter authors by content type, sections, tags or tag categories.
+
+You can combine multiple filters for each filter category. Filters in and between categories are joined with `AND`, values in filter are joined with `OR`.
 
 ##### *Headers:*
 
@@ -1027,11 +1239,132 @@ You can filter tags by time of pageview.
 ```json5
 {
 	"from": "2020-08-10T08:14:09+00:00", // RFC3339-based start datetime from which to take pageviews to this today 
+	"limit": 3, // limit how many top authors this endpoint returns
+	"content_type": "article", // String; OPTIONAL; filters articles by content_type
+	"sections": [ // OPTIONAL; filters from which sections take articles (use either external_id or name arrays, not both); filters joined with AND
+		{"external_ids": ["Section external ids"]}, // String; section external IDs; values joined with OR
+		{"names": ["Section titles"]} // String; section names; values joined with OR
+	],
+	"tags": [ // OPTIONAL; filters articles with tags (use either external_id or name arrays, not both); filters joined with AND
+		{"external_ids": ["Tag external ids"]}, // String; tag external IDs; values joined with OR
+		{"names": ["Tag titles"]} // String; tag names; values joined with OR
+	],
+	"tag_categories": [ // OPTIONAL; filters articles with tag categories (use either external_id or name arrays, not both); filters joined with AND
+		{"external_ids": ["tag category external ids"]}, // String; tag category external IDs; values joined with OR 
+		{"names": ["tag category names"]} // String; tag category names; values joined with OR
+	]
+}
+```
+
+##### *Examples*:
+
+<details>
+<summary>curl</summary>
+
+```shell
+curl --location --request POST 'http://beam.remp.press/api/v2/authors/top' \
+--header 'Content-Type: application/json' \
+--header 'Accept: application/json' \
+--header 'Authorization: Bearer XXX' \
+--data-raw '{
+	"from": "2020-08-10T08:14:09+00:00",
+	"limit": 3,
+	"content_type": "article",
+	"sections": [
+		{"external_ids": ["22"]}
+	],
+	"tags": [
+		{"external_ids": ["10"]}
+	],
+	"tag_categories": [
+		{"external_ids": ["1"]}
+	]
+}'
+```
+
+</details>
+
+<details>
+<summary>raw PHP</summary>
+
+```php
+$payload = [
+	"from" => "2020-08-10T08:14:09+00:00",
+	"limit" => 3,
+	"content_type" => "article",
+	"sections" => [
+		["names" => ["Blog"]]
+	],
+	"tags" => [
+		["names" => ["News"]]
+	],
+	"tag_categories" => [
+		["names" => ["Europe"]]
+	]
+];
+$jsonPayload = json_encode($payload);
+$context = stream_context_create([
+        'http' => [
+            'method' => 'POST',
+            'header' => "Content-Type: type=application/json\r\n"
+                . "Accept: application/json\r\n"
+                . "Content-Length: " . strlen($jsonPayload) . "\r\n"
+                . "Authorization: Bearer XXX",
+            'content' => $jsonPayload,
+        ]
+    ]
+);
+$response = file_get_contents("http://beam.remp.press/api/v2/authors/top", false, $context);
+// process response (raw JSON string)
+```
+
+</details>
+
+##### *Response:*
+
+```json5
+[
+    {
+        "external_id": 100,
+        "name": "Example Author",
+        "pageviews": 23000
+    }
+]
+```
+
+---
+
+##### POST `api/tags/top`
+
+Beam admin provides statistics about tag performance. This endpoint return top post tags by pageviews.
+You can filter tags by content type, sections, authors or tag categories.
+
+##### *Headers:*
+
+| Name | Value | Required | Description |
+| --- |---| --- | --- |
+| Authorization | Bearer *String* | yes | API token. |
+| Content-Type | application/json | yes |  |
+| Accept | application/json | yes |  |
+
+##### *Body:*
+
+```json5
+{
+	"from": "2020-08-10T08:14:09+00:00", // RFC3339-based start datetime from which to take pageviews to this today
 	"limit": 3, // limit how many top tags this endpoint returns
 	"content_type": "article", // String; OPTIONAL; filters articles by content_type
 	"sections": { // OPTIONAL; filters from which sections take articles (use either external_id or name arrays, not both)
-		"external_id": ["Section external id"], // String; section external IDs 
+		"external_id": ["Section external id"], // String; section external IDs
 		"name": ["Section title"] // String; section external_id
+	},
+	"authors": { // OPTIONAL; filters from which authors take articles (use either external_id or name arrays, not both)
+		"external_id": ["author external id"], // String; section external IDs
+		"name": ["author name"] // String; section external_id
+	},
+	"tag_categories": { // OPTIONAL; filters articles with tag categories (use either external_id or name arrays, not both)
+		"external_id": ["tag category external id"], // String; tag category external IDs
+		"name": ["tag category name"] // String; tag category names
 	}
 }
 ```
@@ -1049,7 +1382,16 @@ curl --location --request POST 'http://beam.remp.press/api/tags/top' \
 --data-raw '{
 	"from": "2020-08-10T08:14:09+00:00",
 	"limit": 3,
-	"content_type": "article"
+	"content_type": "article",
+	"sections": {
+		"external_id": ["1"]
+	},
+	"authors": {
+		"external_id": ["123"]
+	},
+	"tag_categories": {
+		"external_id": ["1"]
+	}
 }'
 ```
 
@@ -1062,7 +1404,16 @@ curl --location --request POST 'http://beam.remp.press/api/tags/top' \
 $payload = [
 	"from" => "2020-08-10T08:14:09+00:00",
 	"limit" => 3,
-	"content_type" => "article"
+	"content_type" => "article",
+	"sections" => [
+		"name" => ["Blog"]
+	],
+	"authors" => [
+		"name" => ["John Doe"]
+	],
+	"tag_categories" => [
+		"name" => ["Europe"]
+	]
 ];
 $jsonPayload = json_encode($payload);
 $context = stream_context_create([
@@ -1102,6 +1453,336 @@ $response = file_get_contents("http://beam.remp.press/api/tags/top", false, $con
         "external_id": "3"
     }
 ]
+```
+
+---
+
+##### POST `api/v2/tags/top`
+
+Beam admin provides statistics about tag performance. This endpoint return top post tags by pageviews.
+You can filter tags by content type, sections, authors or tag categories.
+
+You can combine multiple filters for each filter category. Filters in and between categories are joined with `AND`, values in filter are joined with `OR`.
+
+##### *Headers:*
+
+| Name | Value | Required | Description |
+| --- |---| --- | --- |
+| Authorization | Bearer *String* | yes | API token. |
+| Content-Type | application/json | yes |  |
+| Accept | application/json | yes |  |
+
+##### *Body:*
+
+```json5
+{
+	"from": "2020-08-10T08:14:09+00:00", // RFC3339-based start datetime from which to take pageviews to this today 
+	"limit": 3, // limit how many top tags this endpoint returns
+	"content_type": "article", // String; OPTIONAL; filters articles by content_type
+	"sections": [ // OPTIONAL; filters from which sections take articles (use either external_id or name arrays, not both); filters joined with AND
+		{"external_ids": ["Section external ids"]}, // String; section external IDs; values joined with OR
+		{"names": ["Section titles"]} // String; section external_id; values joined with OR
+	],
+	"authors": [ // OPTIONAL; filters from which authors take articles (use either external_id or name arrays, not both); filters joined with AND
+		{"external_ids": ["author external ids"]}, // String; section external IDs; values joined with OR
+		{"names": ["author names"]} // String; section external_id; values joined with OR
+	],
+	"tag_categories": [ // OPTIONAL; filters articles with tag categories (use either external_id or name arrays, not both); filters joined with AND
+		{"external_ids": ["tag category external ids"]}, // String; tag category external IDs; values joined with OR 
+		{"names": ["tag category names"]} // String; tag category names; values joined with OR
+	]
+}
+```
+
+##### *Examples*:
+
+<details>
+<summary>curl</summary>
+
+```shell
+curl --location --request POST 'http://beam.remp.press/api/v2/tags/top' \
+--header 'Content-Type: application/json' \
+--header 'Accept: application/json' \
+--header 'Authorization: Bearer XXX' \
+--data-raw '{
+	"from": "2020-08-10T08:14:09+00:00",
+	"limit": 3,
+	"content_type": "article",
+	"sections": [
+		{"external_ids": ["1"]}
+	],
+	"authors": [
+		{"external_ids": ["123"]}
+	],
+	"tag_categories": [
+		{"external_ids": ["1"]}
+	]
+}'
+```
+
+</details>
+
+<details>
+<summary>raw PHP</summary>
+
+```php
+$payload = [
+	"from" => "2020-08-10T08:14:09+00:00",
+	"limit" => 3,
+	"content_type" => "article",
+	"sections" => [
+		["names" => ["Blog"]]
+	],
+	"authors" => [
+		["names" => ["John Doe"]]
+	],
+	"tag_categories" => [
+		["names" => ["Europe"]]
+	]
+];
+$jsonPayload = json_encode($payload);
+$context = stream_context_create([
+        'http' => [
+            'method' => 'POST',
+            'header' => "Content-Type: type=application/json\r\n"
+                . "Accept: application/json\r\n"
+                . "Content-Length: " . strlen($jsonPayload) . "\r\n"
+                . "Authorization: Bearer XXX",
+            'content' => $jsonPayload,
+        ]
+    ]
+);
+$response = file_get_contents("http://beam.remp.press/api/v2/tags/top", false, $context);
+// process response (raw JSON string)
+```
+
+</details>
+
+##### *Response:*
+
+```json5
+[
+    {
+        "name": "ekonomika",
+        "pageviews": 4000,
+        "external_id": "1"
+    },
+    {
+        "name": "covid19",
+        "pageviews": 3000,
+        "external_id": "2"
+    },
+    {
+        "name": "brexit",
+        "pageviews": 2000,
+        "external_id": "3"
+    }
+]
+```
+
+---
+
+##### POST `api/pageviews/histogram`
+
+Beam admin provides pageviews histogram for articles satisfying the filter for days in date range. 
+You can filter articles by content type, sections, authors, tags or tag categories.
+
+You can combine multiple filters for each filter category. Filters in and between categories are joined with `AND`, values in filter are joined with `OR`.
+
+##### *Headers:*
+
+| Name | Value | Required | Description |
+| --- |---| --- | --- |
+| Authorization | Bearer *String* | yes | API token. |
+| Content-Type | application/json | yes |  |
+| Accept | application/json | yes |  |
+
+##### *Body:*
+
+```json5
+{
+	"from": "2020-08-10", // date from which take pageviews including
+	"to": "2020-08-12", // date to which take pageviews
+	"content_type": "article", // String; OPTIONAL; filters articles by content_type
+	"sections": [ // OPTIONAL; filters from which sections take articles (use either external_id or name arrays, not both); filters joined with AND
+		{"external_ids": ["Section external ids"]}, // String; section external IDs; values joined with OR
+		{"names": ["Section titles"]} // String; section names; joined with OR; values joined with OR
+	],
+	"authors": [ // OPTIONAL; filters from which authors take articles (use either external_id or name arrays, not both); filters joined with AND
+		{"external_ids": ["author external ids"]}, // String; author external IDs; values joined with OR
+		{"names": ["author names"]} // String; author names; joined with OR; values joined with OR
+	],
+	"tags": [ // OPTIONAL; filters articles with tags (use either external_id or name arrays, not both); filters joined with AND
+		{"external_ids": ["tag external ids"]}, // String; tag external IDs; values joined with OR
+		{"names": ["tag names"]} // String; tag names; values joined with OR
+	],
+	"tag_categories": [ // OPTIONAL; filters articles with tag categories (use either external_id or name arrays, not both); filters joined with AND
+		{"external_ids": ["tag category external ids"]}, // String; tag category external IDs; values joined with OR
+		{"names": ["tag category names"]} // String; tag category names; values joined with OR
+	]
+}
+```
+
+##### *Examples*:
+
+<details>
+<summary>curl</summary>
+
+```shell
+curl --location --request POST 'http://beam.remp.press/api/pageviews/histogram' \
+--header 'Content-Type: application/json' \
+--header 'Accept: application/json' \
+--header 'Authorization: Bearer XXX' \
+--data-raw '{
+	"from": "2020-08-10",
+	"to": "2020-08-12",
+	"content_type": "article",
+	"sections": [
+		{"external_ids": ["1", "2"]},
+		{"names": ["World"]}
+	],
+	"authors": [
+		{"external_ids": ["123"]}
+	],
+	"tags": [
+		{"external_ids": ["10"]}
+	],
+	"tag_categories": [
+		{"external_ids": ["1"]}
+	]
+}'
+```
+
+</details>
+
+<details>
+<summary>raw PHP</summary>
+
+```php
+$payload = [
+	"from" => "2020-08-10",
+	"to" => "2020-08-12",
+	"content_type" => "article",
+	"sections" => [
+		["names" => ["Blog"]]
+	],
+	"authors" => [
+		["names" => ["John Doe"]]
+	],
+	"tags" => [
+		["names" => ["News"]]
+	],
+	"tag_categories" => [
+		["names" => ["Europe"]]
+	]
+];
+$jsonPayload = json_encode($payload);
+$context = stream_context_create([
+        'http' => [
+            'method' => 'POST',
+            'header' => "Content-Type: type=application/json\r\n"
+                . "Accept: application/json\r\n"
+                . "Content-Length: " . strlen($jsonPayload) . "\r\n"
+                . "Authorization: Bearer XXX",
+            'content' => $jsonPayload,
+        ]
+    ]
+);
+$response = file_get_contents("http://beam.remp.press/api/pageviews/histogram", false, $context);
+// process response (raw JSON string)
+```
+
+</details>
+
+##### *Response:*
+
+```json5
+[
+    {
+        "date": "2020-08-10",
+        "pageviews": 274
+    },
+    {
+        "date": "2020-08-11",
+        "pageviews": 150
+    }
+]
+```
+
+---
+
+##### GET `/api/articles`
+
+Returns list of articles specified by ids or external ids.
+
+##### *Headers:*
+
+| Name | Value | Required | Description |
+| --- |---| --- | --- |
+| Authorization | Bearer *String* | yes | API token. |
+| Content-Type | application/json | yes |  |
+| Accept | application/json | yes |  |
+
+##### *Examples:*
+
+<details>
+<summary>curl</summary>
+
+```shell
+curl -X GET \
+  http://beam.remp.press/api/articles?external_ids=123,231 \
+  -H 'Accept: application/json' \
+  -H 'Authorization: Bearer XXX' \
+  -H 'Content-Type: application/json'
+```
+
+</details>
+
+<details>
+<summary>raw PHP</summary>
+
+```php
+$context = stream_context_create([
+        'http' => [
+            'method' => 'GET',
+            'header' => "Content-Type: type=application/json\r\n"
+                . "Accept: application/json\r\n"
+                . "Content-Length: " . strlen($jsonPayload) . "\r\n"
+                . "Authorization: Bearer XXX",
+        ]
+    ]
+);
+$response = file_get_contents("http://beam.remp.press/api/articles?external_ids=123,231", false, $context);
+// process response (raw JSON string)
+```
+
+</details>
+
+##### *Response:*
+
+```json5
+{
+  "data": [
+    {
+      "id": 123,
+      "external_id": "123",
+      "property_uuid": "a6c80469-464d-4118-830c-0448494ada86",
+      "title": "Test article title",
+      "url": "http:\/\/example.com\/test-article\/",
+      "content_type": "article",
+      "image_url": "http:\/\/example.com\/test-article\/image.jpg",
+      "published_at": "2021-04-13 09:26:10",
+      "pageviews_all": 7505,
+      "pageviews_signed_in": 4492,
+      "pageviews_subscribers": 4029,
+      "timespent_all": 900715,
+      "timespent_signed_in": 789643,
+      "timespent_subscribers": 758675,
+      "created_at": "2021-04-13 09:26:13",
+      "updated_at": "2021-04-14 06:27:13"
+    }
+  ]
+}
 ```
 
 ### Scheduled events
@@ -1181,6 +1862,10 @@ of payment life-cycle:
 * *Purchase*. The purchase was successful.
 * *Refund*. User requested the refund which was fulfilled.
 
+JS library provided by Beam is sending identifier `commerce_session_id` for every step and it's used to identify
+unique payment process. To reach the data consistency between commerce events from JS library and CRM backend it's necessary
+to send this parameter.
+
 See the available endpoints with full JSON structure at `/swagger.json` path of running Tracker API.
 
 #### Javascript Snippet
@@ -1189,6 +1874,9 @@ Any pageview-related data should be tracked from within the browser. Beam provid
 for tracking these kind of data.
 
 Include following snippet into your pages and update `rempConfig` object as needed.
+
+**Note:** make sure your HTML document working with the snippet has correctly defined character encoding. Character encoding can be specified using `meta` tag, e.g. `<meta charset="UTF-8" />`.
+
 
 ```javascript
 (function(win, doc) {
@@ -1222,7 +1910,7 @@ Include following snippet into your pages and update `rempConfig` object as need
             }
         }
     });
-    
+
     // change URL to location of BEAM remplib.js
     load("http://beam.remp.press/assets/lib/js/remplib.js");
 })(window, document);
@@ -1232,51 +1920,70 @@ var rempConfig = {
     // UUIDv4 based REMP BEAM token of appropriate property
     // (see BEAM Admin -> Properties)
     token: String,
-    
+
     // optional, identification of logged user
     userId: String,
-    
-    // optional, flag whether user is currently subscribed to the displayed content 
+
+    // optional, flag whether user is currently subscribed to the displayed content
     userSubscribed: Boolean,
-    
+
+    // optional, IDs of currently active subscriptions granting user access
+    subscriptionIds: [String, String, String],
+
     // optional, this is by default generated by remplib.js library and you don't need to override it
     browserId: String,
-    
+
     // optional, controls where cookies (UTM parameters of visit) are stored
     cookieDomain: ".remp.press",
-    
+
+    // optional, controls which type of storage should be used by default (`local_storage` or `cookie`)
+    // default is `local_storage`
+    storage: "local_storage",
+
+    // optional, specifies how long to store specific keys in storage (in minutes)
+    storageExpiration: {
+        // default value (in minutes) for all storage keys if not overriden in `keys`
+        "default": 15,
+        // specific pairs of key name and life length in minutes
+        "keys": {
+            "browser_id": 1051200, // 2 years in minutes
+            "campaigns": 1051200
+        }
+    },
+
     // optional, article details if pageview is on the article
     article: {
         id: String, // required, ID of article in your CMS
         author_id: String, // optional, name of the author
         category: String, // optional, category/section of the article
         locked: Boolean, // optional, flag whether content was locked at the time of visit for this pageview
+        contentType: String, // optional, type of the content, 'article' if not specified or 'feed'
         tags: [String, String, String], // optional, any tags associated with the article
         elementFn: Function // callback returning DOM element containing article content
     },
-            
-    // required, Tracker API specific options          
+
+    // required, Tracker API specific options
     tracker: {
         // required, URL location of BEAM Tracker
         url: "http://tracker.beam.remp.press",
-        
+
         // optional time spent measuring (disabled by default)
         // if enabled, tracks time spent on current page
         timeSpent: {
             enabled: Boolean, // if enabled, tracks time spent on the webpage
             interval: Number, // optional, frequency of sending tracked progress in seconds (default value 5; interval is progressive and gets prolonged in time)
         },
-        
+
         // optional, achieved scroll depth tracking (disabled by default)
         readingProgress: {
             enabled: Boolean, // if enabled, tracks achieved scroll depth
             interval: Number // optional, frequency of sending tracked progress in seconds (default value 5)
         },
-        
-        // optional, allows to specify custom referer medium  
-        // this value overrides implicit referer medium computed from Referer header by tracker 
+
+        // optional, allows to specify custom referer medium
+        // this value overrides implicit referer medium computed from Referer header by tracker
         refererMedium: "push_notification"
-    },
+    }
 };
 remplib.tracker.init(rempConfig);
 ```
@@ -1308,6 +2015,13 @@ is 1 second, but it's safe to raise it to more than 5 seconds as *unload* event 
 
 You can enable the tracking by setting `rempConfig.tracker.readingProgress = { enabled: true }`
 
+##### Single-page applications
+
+If you use single-page application and need to reinitialize JS library after it's been loaded:
+
+1. Update the `rempConfig` variable to reflect the navigation changes.
+2. Call `remplib.tracker.init(rempConfig)` again to reinitialize the JS tracking state. New pageview will be tracked automatically and timespent/progress tracking will be reset.
+
 ##### JS tracking interface
 
 Note: The *source* object is referenced as a parameter in the following API calls. Here's the list of parameters
@@ -1318,16 +2032,21 @@ The expected value is always as follows (all are optional):
 
 ```
 {
-  "utm_medium": String,
-  "utm_campaign": String,
-  "utm_source": String,
-  "utm_content": String,
-  "banner_variant": String
+  "rtm_medium": String,
+  "rtm_campaign": String,
+  "rtm_source": String,
+  "rtm_content": String,
+  "rtm_variant": String
 }
 ```
 
-If the *source* is not provided, JS library tries to load the values from local storage which were stored last time
-they appeared in the visited URL.
+_**Warning:** Previously, `utm_` prefix was used instead of `rtm_` (and `banner_variant` instead of `rtm_variant`), but was replaced to avoid collision with other tracking software. However, `utm_` parameters are still loaded if no `rtm_` parameters are found. This is deprecated behaviour and will be turned off in the future.
+To turn it off manually, add the following setting: `rempConfig.tracker.utmBackwardCompatibilityEnabled = false`._
+
+
+If the *source* is not provided, JS library tries to load the values from the visited URL.
+
+Information about *article* is sent by default if has been provided within the initialization. You are able to change it before the tracking with function `remplib.tracker.setArticle({id: ...})`.
 
 Here's the list of supported tracking methods:
 
@@ -1336,18 +2055,19 @@ Here's the list of supported tracking methods:
     * `action`: Actual event name (e.g. `"click"`).
     * `tags`: Extra metadata you want to track with event (e.g. `{foo: bar}`).
     * `fields`: Extra metadata you want to track with event (e.g. `{foo: bar}`)).
-    * `source`: Object with utm parameters (e.g. `{ utm_campaign: "foo" }`). 
-    
-* `remplib.tracker.trackCheckout(funnelId)`: tracks checkout commerce event - indicating that user is summarizing the order 
+    * `source`: Object with utm parameters (e.g. `{ utm_campaign: "foo" }`).
+
+* `remplib.tracker.trackCheckout(funnelId, includeStorageParams)`: tracks checkout commerce event - indicating that user is summarizing the order
     * `funnelId`: Reference to funnel bringing user to checkout page. You can use IDs if your system contains referencable
     funnels or string keys otherwise. If your system doesn't support funnels and you don't need to differentiate them,
     use `"default"`.
-    
-* `remplib.tracker.trackCheckoutWithSource: function(funnelId, article, source)`: tracks checkout commerce event with custom article source - indicating that user is summarizing his order 
+    * `includeStorageParams`: Optional boolean flag indicates whether `source` params from local storage should be used.
+
+* `remplib.tracker.trackCheckoutWithSource: function(funnelId, article, source)`: tracks checkout commerce event with custom article source - indicating that user is summarizing his order
 	* `funnelId`: Reference to funnel bringing user to checkout page. You can use IDs if your system contains
 	referencable funnels or string keys otherwise. If your system doesn't support funnels and you don't need
 	to differentiate them and `default` is a recommended value.
-    * `article`: Object with info about current article (it is safe to reuse `remplib.tracker.article` 
+    * `article`: Object with info about current article (it is safe to reuse `remplib.tracker.article`
     if you don't want to make any changes).
 		```
 		{
@@ -1358,21 +2078,21 @@ Here's the list of supported tracking methods:
 			tags: [String, String, String], // optional, any tags associated with the article
 		}
 		```
-	
+
     * `source`: Object with utm parameters (e.g. `{ utm_campaign: "foo" }`).
-    
+
 * `remplib.tracker.trackPayment(transactionId, amount, currency, productIds)`: tracks commerce payment event - indicating
 that the payment has started (user was redirected to payment gateway)
-    * `transactionId`: Reference to transaction (should be unique for every payment; e.g. `"778453213"`) 
+    * `transactionId`: Reference to transaction (should be unique for every payment; e.g. `"778453213"`)
     * `amount`: Numeric amount (e.g. `18.99`)
     * `currency`: String currency (e.g. `EUR`)
     * `productIds`: List of purchased products (e.g. `["product_1"]`)
-    
-* `remplib.tracker.trackPaymentWithSource: function(transactionId, amount, currency, productIds, article, source)`: 
+
+* `remplib.tracker.trackPaymentWithSource: function(transactionId, amount, currency, productIds, article, source)`:
 tracks commerce payment event with custom article and source - indicating that the payment has started
 (user was redirected to payment gateway)
 
-* `remplib.tracker.trackPurchase(transactionId, amount, currency, productIds)`: tracks commerce purchase event - 
+* `remplib.tracker.trackPurchase(transactionId, amount, currency, productIds)`: tracks commerce purchase event -
 indicating that the payment was successful
 
 * `remplib.tracker.trackPurchaseWithSource: function(transactionId, amount, currency, productIds, article, source)`:
@@ -1392,7 +2112,7 @@ indicating that confirmed payment (one that had *purchase* event) was refunded
 - Kafka ^0.10
 - Zookeeper ^3.4
 - MySQL ^5.7
-    
+
 ## [Segments](go/cmd/segments) (Go)
 
 Beam Segments serves as a read-only API for getting information about segments and users of these segments.
@@ -1409,7 +2129,7 @@ in your own extensions/implementation.
 
 #### Dependencies
 
-- Elastic ^6.2
+- Elastic ^7.5
 - MySQL ^5.7
 
 ## [Telegraf](../Docker/telegraf)
@@ -1464,7 +2184,7 @@ rempConfig.iota = {
     // if not present, stats are appended as next sibling to matchedElement
     // stats are positioned absolutely, so they need a relative parent
     targetElementCallback: Function, // function (matchedElement) {}
-    // optional: HTTP headers to be used in API calls 
+    // optional: HTTP headers to be used in API calls
     httpHeaders: Object
 };
 
@@ -1497,7 +2217,7 @@ of the data tracked.
 Similar to previous section, we're not able to generate generic segments that would be 100%
 accurate. Thanks to industry knowledge and tracked data we're able to provide set of segments
 to target visitors with low conversion probability which you can test and find which one
-suits your visitor base the best. 
+suits your visitor base the best.
 
 Segments are generated during the installation of Beam and can be generated also manually via
 running `db:seed` command. Recommended segments contain users matching these criteria:
@@ -1538,7 +2258,7 @@ There are two possible solutions for this:
 
 * Keep the number of shards and remove old data that you don't need anymore. You can use `es2csv` tool for backing up
 data to CSV files first. Downside is that removing data from index is computationally intensive operation.
-* Split indices in the background and hide them behind aliases. 
+* Split indices in the background and hide them behind aliases.
 
 If storage is not an issue for you, we recommend splitting the indices. Our implementation supports aliases and they
 can be used both for reading and writing to indices. If you expect your data to be big from the beginning, it's good
@@ -1552,7 +2272,7 @@ from prepared indices:
   * `events`
   * `entities`
   * `concurrents_by_browser`
-  
+
 If you start using aliases, it's up to you to maintain that there's always an alias with these names pointing to indices
 where the data is stored - reading aliases can point to multiple indices at the same time.
 
@@ -1576,7 +2296,7 @@ and more about aliases at [Elastic aliases documentation](https://www.elastic.co
     ```
 
     The response should be similar to this:
-    
+
     ```
     {"acknowledged":true,"shards_acknowledged":true,"index":"pageviews-2019.05.17-000001"}
     ```
@@ -1594,13 +2314,13 @@ and more about aliases at [Elastic aliases documentation](https://www.elastic.co
         ]
     }'
     ```
-    
+
     And confirm the aliases are there:
-    
+
     ```
     curl -s localhost:9200/_cat/aliases
     ```
-    
+
     ```
     pageviews       pageviews-2019.05.17-000001 - - -
     pageviews_write pageviews-2019.05.17-000001 - - -
@@ -1635,21 +2355,21 @@ are met, Elasticsearch will create new index.
         }
     }
     ```
-    
+
 * Now check the existing aliases again.
 
     ```
     curl -s localhost:9200/_cat/aliases | grep pageviews
     ```
-    
+
     ```
     pageviews       pageviews-2019.05.17-000001 - - -
     pageviews_write pageviews-2019.05.17-000002 - - -
     ```
-    
+
     See that `pageviews_write` index was rolled over with alias and Telegraf is now inserting data to newly created
     index. However `pageviews` alias doesn't know about the newly created index yet, so we need to add it:
-    
+
     ```
     curl -X POST \
       http://localhost:9200/_aliases \
@@ -1660,15 +2380,15 @@ are met, Elasticsearch will create new index.
         ]
     }'
     ```
-    
+
     Listing of aliases now looks OK:
-    
+
     ```
     pageviews       pageviews-2019.05.17-000001 - - -
     pageviews       pageviews-2019.05.17-000002 - - -
     pageviews_write pageviews-2019.05.17-000002 - - -
     ```
-    
+
 Once configured and scheduled, rollovers will be happening automatically for you. When rollover happens, you need to
 create an alias for this rolled over index so also "reading" alias (e.g. `pageviews`) knows about it.
 

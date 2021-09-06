@@ -10,6 +10,7 @@ use Illuminate\Queue\InteractsWithQueue;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Foundation\Bus\Dispatchable;
 use Illuminate\Support\Facades\Redis;
+use Log;
 
 class CacheSegmentJob implements ShouldQueue
 {
@@ -38,7 +39,10 @@ class CacheSegmentJob implements ShouldQueue
      */
     public function handle(SegmentAggregator $segmentAggregator)
     {
-        if (!$this->force && Redis::connection()->scard($this->key())) {
+        $cacheKey = $segmentAggregator::cacheKey($this->campaignSegment);
+        $cacheTimestampKey = "{$cacheKey}|timestamp";
+
+        if (!$this->force && Redis::connection()->get($cacheTimestampKey)) {
             return;
         }
 
@@ -46,22 +50,21 @@ class CacheSegmentJob implements ShouldQueue
             return;
         }
 
-        $users = $segmentAggregator->users($this->campaignSegment);
-
-        Redis::connection()->del([$this->key()]);
-        if ($users->isNotEmpty()) {
-            Redis::connection()->sadd($this->key(), $users->toArray());
-            Redis::connection()->expire($this->key(), 60*60*24);
+        try {
+            $users = $segmentAggregator->users($this->campaignSegment);
+        } catch (\Exception $e) {
+            Log::error($e->getMessage(), [
+                'provider' => $this->campaignSegment->provider,
+                'code' => $this->campaignSegment->code,
+            ]);
+            throw $e;
         }
-    }
 
-    /**
-     * Key returns unique key under which the data for given campaignSegment are cached.
-     *
-     * @return string
-     */
-    public function key(): string
-    {
-        return "{$this->campaignSegment->provider}|{$this->campaignSegment->code}";
+        Redis::connection()->set($cacheTimestampKey, date('U'), 'EX', 60*60*24);
+        Redis::connection()->del([$cacheKey]);
+        if ($users->isNotEmpty()) {
+            Redis::connection()->sadd($cacheKey, $users->toArray());
+            Redis::connection()->expire($cacheKey, 60*60*24);
+        }
     }
 }

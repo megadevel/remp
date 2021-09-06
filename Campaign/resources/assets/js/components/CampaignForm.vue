@@ -36,7 +36,7 @@
                             <div class="panel-body p-b-30 p-l-10 p-r-20">
 
                                 <div class="row">
-                                    <div class="col-md-9">
+                                    <div class="col-md-12">
 
                                         <div class="input-group fg-float m-t-30">
                                             <span class="input-group-addon"><i class="zmdi zmdi-file-text"></i></span>
@@ -162,6 +162,29 @@
                     </div><!-- .panel (user state) -->
 
                     <div class="panel panel-default">
+                        <div class="panel-heading" role="tab" id="headingPageviewAttributes">
+                            <h4 class="panel-title">
+                                <a role="button" data-toggle="collapse" data-parent="#accordion" href="#collapsePageviewAttributes" aria-expanded="false" aria-controls="collapsePageviewAttributes" :class="{ green: highlightPageviewAttributesCollapse }">
+                                    Pageview attributes
+                                </a>
+                            </h4>
+                        </div>
+                        <div id="collapsePageviewAttributes" class="panel-collapse collapse" role="tabpanel" aria-labelledby="headingUserProperties">
+                            <div class="panel-body p-l-10 p-r-20">
+                                <div class="row">
+                                    <div class="col-md-8">
+                                        <pageview-attributes
+                                            :pageviewAttributes="pageviewAttributes"
+                                            @pageviewAttributesModified="updatePageviewAttributes"
+                                        ></pageview-attributes>
+                                    </div>
+                                </div>
+
+                            </div><!-- .panel-body -->
+                        </div>
+                    </div><!-- .panel (pageview attributes) -->
+
+                    <div class="panel panel-default">
                         <div class="panel-heading" role="tab" id="headingInclusiveSegments">
                             <h4 class="panel-title">
                                 <a role="button" data-toggle="collapse" data-parent="#accordion" href="#collapseInclusiveSegments" aria-expanded="false" aria-controls="collapseInclusiveSegments" :class="{ green: highlightSegmentsCollapse }">
@@ -172,7 +195,7 @@
                         <div id="collapseInclusiveSegments" class="panel-collapse collapse" role="tabpanel" aria-labelledby="headingInclusiveSegments">
                             <div class="panel-body p-l-10 p-r-20">
                                 <div class="row">
-                                    <div class="col-md-8">
+                                    <div class="col-md-12">
                                         <p class="m-l-20">
                                             User <strong>needs to be member of ALL</strong> of these segments in order to see the campaign:
                                         </p>
@@ -208,17 +231,16 @@
                                             <div class="col-md-12">
                                                 <div class="row m-b-10" v-for="(segment,i) in segments" v-if="segment.inclusive == undefined || segment.inclusive" style="line-height: 25px">
                                                     <div class="col-md-12 text-left">
-                                                        {{ segmentMap[segment.code] }}
-                                                        <div class="pull-left m-r-20">
+                                                        <div class="pull-left m-r-10">
                                                             <span v-on:click="removeSegment(i)" class="btn btn-sm bg palette-Red waves-effect p-5 remove-segment" style="font-size:1em">&times;</span>
-                                                        </div>
+                                                        </div> {{ segmentMap[segment.code] }}
                                                     </div>
                                                 </div>
                                             </div>
                                         </div>
                                     </div>
 
-                                    <div class="col-md-8" style="margin-top:15px">
+                                    <div class="col-md-12" style="margin-top:15px">
                                         <p class="m-l-20">
                                             User <strong>CANNOT be member of ANY</strong> of these segments in order to see the campaign:
                                         </p>
@@ -350,10 +372,10 @@
                                     <span class="input-group-addon"><i class="zmdi zmdi-wallpaper"></i></span>
                                     <div>
                                         <div class="row">
-                                            <div class="col-md-12">
+                                            <div class="col-md-8 col-sm-12">
                                                 <label for="countries_blacklist" class="fg-label">Whitelist / Blacklist</label>
                                             </div>
-                                            <div class="col-md-12">
+                                            <div class="col-md-8 col-sm-12">
                                                 <v-select v-model="countriesBlacklist"
                                                         id="countries_blacklist"
                                                         :name="'countries_blacklist'"
@@ -369,7 +391,7 @@
                                     <span class="input-group-addon"><i class="zmdi zmdi-wallpaper"></i></span>
                                     <div>
                                         <div class="row">
-                                            <div class="col-md-12">
+                                            <div class="col-md-8 col-sm-12">
                                                 <select v-model="addedCountry" title="Select countries" v-on:change="selectCountry" class="selectpicker" data-live-search="true" data-max-options="1">
                                                     <option v-for="(obj,iso_code) in availableCountries" :value="obj">
                                                         {{ obj.name }}
@@ -527,11 +549,12 @@
 </template>
 
 <script type="text/javascript">
-    import vSelect from "remp/js/components/vSelect";
+    import vSelect from "@remp/js-commons/js/components/vSelect";
     import PageviewRules from "./PageviewRules";
-    import FormValidator from "remp/js/components/FormValidator";
+    import FormValidator from "@remp/js-commons/js/components/FormValidator";
     import AbTesting from "./AbTesting";
     import UrlRules from "./UrlRules";
+    import PageviewAttributes from "./PageviewAttributes";
 
     let props = [
         "_name",
@@ -563,6 +586,7 @@
         "_eventTypes",
         "_availableCountries",
         "_countriesBlacklistOptions",
+        "_pageviewAttributes",
 
         "_activationMode",
         "_action"
@@ -573,7 +597,8 @@
             AbTesting,
             FormValidator,
             PageviewRules,
-            UrlRules
+            UrlRules,
+            PageviewAttributes
         },
         created: function(){
             let self = this;
@@ -648,6 +673,7 @@
                 "pageviewRules": {},
                 "availableCountries": null,
                 "countriesBlacklistOptions": null,
+                "pageviewAttributes": [],
 
                 "startTime": null,
                 "endTime": null,
@@ -728,6 +754,9 @@
             },
             highlightABTestingCollapse: function () {
                 return (this.variants.length > 2);
+            },
+            highlightPageviewAttributesCollapse: function () {
+                return (this.pageviewAttributes.length > 0);
             }
         },
         methods: {
@@ -786,9 +815,11 @@
                 this.countries.splice(index, 1);
             },
             updatePageviewRules: function (pageviewRules) {
-                console.log('update pageview rules', pageviewRules);
                 this.pageviewRules = pageviewRules.rules;
                 this.oncePerSession = pageviewRules.oncePerSession;
+            },
+            updatePageviewAttributes: function (pageviewAttributes) {
+                this.pageviewAttributes = pageviewAttributes;
             },
         },
         watch: {

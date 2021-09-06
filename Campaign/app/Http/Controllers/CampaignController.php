@@ -9,13 +9,13 @@ use App\CampaignSegment;
 use App\Contracts\SegmentAggregator;
 use App\Contracts\SegmentException;
 use App\Country;
-use App\Http\Request;
 use App\Http\Requests\CampaignRequest;
 use App\Http\Resources\CampaignResource;
 use App\Http\Showtime\ControllerShowtimeResponse;
 use App\Http\Showtime\Showtime;
 use App\Schedule;
 use Carbon\Carbon;
+use Illuminate\Http\Request;
 use View;
 use HTML;
 use Illuminate\Http\JsonResponse;
@@ -156,13 +156,13 @@ class CampaignController extends Controller
     {
         $campaign = new Campaign();
 
-        list(
+        [
             $campaign,
             $bannerId,
             $variants,
             $selectedCountries,
             $countriesBlacklist
-        ) = $this->processOldCampaign($campaign, old());
+        ] = $this->processOldCampaign($campaign, old());
 
         return view('campaigns.create', [
             'campaign' => $campaign,
@@ -183,13 +183,13 @@ class CampaignController extends Controller
 
         flash(sprintf('Form has been pre-filled with data from campaign "%s"', $sourceCampaign->name))->info();
 
-        list(
+        [
             $campaign,
             $bannerId,
             $variants,
             $selectedCountries,
             $countriesBlacklist
-        ) = $this->processOldCampaign($campaign, old());
+        ] = $this->processOldCampaign($campaign, old());
 
         return view('campaigns.create', [
             'campaign' => $campaign,
@@ -275,13 +275,13 @@ class CampaignController extends Controller
      */
     public function edit(Campaign $campaign, SegmentAggregator $segmentAggregator)
     {
-        list(
+        [
             $campaign,
             $bannerId,
             $variants,
             $selectedCountries,
             $countriesBlacklist
-        ) = $this->processOldCampaign($campaign, old());
+        ] = $this->processOldCampaign($campaign, old());
 
         return view('campaigns.edit', [
             'campaign' => $campaign,
@@ -350,7 +350,6 @@ class CampaignController extends Controller
         $newScheduleStartTime = null,
         $newScheduleEndTime = null
     ): ?string {
-
         if ($activationMode === 'activate-schedule'
             && !is_null($newScheduleStartTime)) {
             $schedule = new Schedule();
@@ -499,6 +498,10 @@ class CampaignController extends Controller
         $data = $request->get('data');
         $callback = $request->get('callback');
 
+        if ($data === null || $callback === null) {
+            return response()->json(['errors' => ['invalid request, data or callback params missing']], 400);
+        }
+
         return $showtime->showtime($data, $callback, $controllerShowtimeResponse);
     }
 
@@ -568,7 +571,7 @@ class CampaignController extends Controller
         // main banner
         if (array_key_exists('banner_id', $data)) {
             $bannerId = $data['banner_id'];
-        } else if (!$campaign->campaignBanners->isEmpty()) {
+        } elseif (!$campaign->campaignBanners->isEmpty()) {
             $bannerId = optional($campaign->campaignBanners[0])->banner_id;
         } else {
             $bannerId = optional($campaign->campaignBanners()->first())->banner_id;
@@ -577,7 +580,7 @@ class CampaignController extends Controller
         // variants
         if (array_key_exists('variants', $data)) {
             $variants = $data['variants'];
-        } else if (!$campaign->campaignBanners->isEmpty()) {
+        } elseif (!$campaign->campaignBanners->isEmpty()) {
             $variants = $campaign->campaignBanners;
         } else {
             $variants = $campaign->campaignBanners()
@@ -619,7 +622,7 @@ class CampaignController extends Controller
         Request $request
     ) {
         $variants = $campaign->campaignBanners()->withTrashed()->with("banner")->get();
-        $from = $request->input('from', 'today - 2 days');
+        $from = $request->input('from', 'today - 30 days');
         $to = $request->input('to', 'now');
 
         $variantBannerLinks = [];

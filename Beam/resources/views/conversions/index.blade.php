@@ -34,6 +34,13 @@
                     'orderable' => false,
                     'priority' => 1,
                 ],
+                'content_type' => [
+                    'header' => 'Type',
+                    'orderable' => false,
+                    'filter' => $contentTypes,
+                    'priority' => 2,
+                    'visible' => count($contentTypes) > 1,
+                ],
                 'article.authors[, ].name' => [
                     'header' => 'authors',
                     'orderable' => false,
@@ -56,6 +63,7 @@
                     'header' => 'amount',
                     'render' => 'number',
                     'priority' => 1,
+                    'orderSequence' => ['desc', 'asc'],
                     'className' => 'text-right',
                 ],
                 'currency' => [

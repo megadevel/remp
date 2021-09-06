@@ -4,7 +4,7 @@ namespace App\Console\Commands;
 
 use App\Segment;
 use App\SegmentGroup;
-use Illuminate\Console\Command;
+use App\Console\Command;
 use Illuminate\Support\Carbon;
 use Remp\Journal\AggregateRequest;
 use Remp\Journal\JournalContract;
@@ -17,12 +17,11 @@ class ProcessPageviewLoyalVisitors extends Command
 
     public function handle(JournalContract $journalContract)
     {
-        ini_set('memory_limit', '-1');
         $days = $this->option('days') ?? 30;
 
         if (!$days) {
             $this->line("No days to process, exiting.");
-            return;
+            return 0;
         }
 
         $bar = $this->output->createProgressBar($days);
@@ -34,8 +33,8 @@ class ProcessPageviewLoyalVisitors extends Command
 
         foreach (range(1, $days) as $dayOffset) {
             $now = Carbon::now();
-            $timeBefore = $now->copy()->hour(0)->minute(0)->second(0)->subDays($dayOffset);
-            $timeAfter = $now->copy()->hour(0)->minute(0)->second(0)->subDays($dayOffset+1);
+            $timeBefore = $now->copy()->setTime(0, 0)->subDays($dayOffset);
+            $timeAfter = $now->copy()->setTime(0, 0)->subDays($dayOffset+1);
 
             $request = new AggregateRequest('pageviews', 'load');
             $request->setTimeAfter($timeAfter);
@@ -88,13 +87,13 @@ class ProcessPageviewLoyalVisitors extends Command
 
         if ($treshold <= 1) {
             $this->line("No segment will be created, treshold would be too low");
-            return;
+            return 1;
         }
 
         $segmentCode = "{$treshold}-plus-article-views-in-{$days}-days";
         if (\App\Segment::where(['code' => $segmentCode])->exists()) {
             $this->line("Segment <info>{$segmentCode}</info> already exists, no new segment was created");
-            return;
+            return 2;
         }
 
         $segment = Segment::create([
@@ -114,5 +113,6 @@ class ProcessPageviewLoyalVisitors extends Command
         ]);
 
         $this->line("Segment <info>{$segmentCode}</info> was created, you can use it to target your loyal audience");
+        return 0;
     }
 }

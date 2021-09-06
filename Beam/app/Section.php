@@ -2,10 +2,13 @@
 
 namespace App;
 
-use Illuminate\Database\Eloquent\Model;
+use App\Model\BaseModel;
+use Illuminate\Database\Eloquent\Factories\HasFactory;
 
-class Section extends Model
+class Section extends BaseModel
 {
+    use HasFactory;
+
     protected $fillable = [
         'name',
         'external_id',

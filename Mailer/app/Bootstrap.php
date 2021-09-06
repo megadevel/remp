@@ -1,11 +1,10 @@
 <?php
+declare(strict_types=1);
 
-namespace Remp;
+namespace Remp\Mailer;
 
 use Dotenv\Dotenv;
 use Nette\Configurator;
-
-require __DIR__ . '/../vendor/autoload.php';
 
 final class Bootstrap
 {
@@ -44,6 +43,10 @@ final class Bootstrap
             ->addDirectory(__DIR__)
             ->register();
 
+        // Root config, so MailerModule can register extensions, etc.
+        $configurator->addConfig(__DIR__ . '/../vendor/remp/mailer-module/src/config/config.root.neon');
+
+        // Rest of configuration
         $configurator->addConfig(__DIR__ . '/config/config.neon');
         $configurator->addConfig(__DIR__ . '/config/config.local.neon');
 

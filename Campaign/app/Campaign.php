@@ -2,6 +2,7 @@
 
 namespace App;
 
+use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Fico7489\Laravel\Pivot\Traits\PivotEventTrait;
 use Illuminate\Database\Eloquent\Model;
 use Ramsey\Uuid\Uuid;
@@ -11,7 +12,10 @@ use Spatie\Searchable\SearchResult;
 
 class Campaign extends Model implements Searchable
 {
+    use HasFactory;
+
     use PivotEventTrait;
+    use IdentificationTrait;
 
     const ACTIVE_CAMPAIGN_IDS = 'active_campaign_ids';
     const CAMPAIGN_TAG = 'campaign';
@@ -27,11 +31,14 @@ class Campaign extends Model implements Searchable
     const URL_FILTER_ONLY_AT = 'only_at';
     const URL_FILTER_EXCEPT_AT = 'except_at';
 
+    private static $activeCache;
+
     protected $fillable = [
         'name',
         'signed_in',
         'once_per_session',
         'pageview_rules',
+        'pageview_attributes',
         'devices',
         'using_adblock',
         'url_filter',
@@ -45,6 +52,7 @@ class Campaign extends Model implements Searchable
         'signed_in' => 'boolean',
         'once_per_session' => 'boolean',
         'pageview_rules' => 'json',
+        'pageview_attributes' => 'json',
         'devices' => 'json',
         'using_adblock' => 'boolean',
         'url_patterns' => 'json',
@@ -55,6 +63,7 @@ class Campaign extends Model implements Searchable
         'once_per_session' => false,
         'using_adblock' => null,
         'pageview_rules' => '[]',
+        'pageview_attributes' => '[]',
         'devices' => "[\"desktop\", \"mobile\"]",
         'url_filter' => self::URL_FILTER_EVERYWHERE,
         'referer_filter' => self::URL_FILTER_EVERYWHERE,
@@ -72,7 +81,8 @@ class Campaign extends Model implements Searchable
         parent::boot();
 
         static::creating(function (Campaign $campaign) {
-            $campaign->uuid = Uuid::uuid4()->toString();
+            $campaign->uuid = self::generateUuid();
+            $campaign->public_id = self::generatePublicId();
         });
     }
 
@@ -83,10 +93,17 @@ class Campaign extends Model implements Searchable
      */
     public function getActiveAttribute()
     {
-        if ($this->schedules()->runningOrPlanned()->count()) {
-            return true;
+        if (!self::$activeCache) {
+            self::$activeCache = Schedule::runningOrPlanned()
+                ->groupBy('campaign_id')
+                ->selectRaw('COUNT(*) as count, campaign_id')
+                ->get()
+                ->mapWithKeys(function ($row) {
+                    return [$row->campaign_id => $row->count];
+                });
         }
-        return false;
+
+        return self::$activeCache->get($this->id, 0) > 0;
     }
 
     /**
@@ -231,6 +248,9 @@ class Campaign extends Model implements Searchable
 
     public function cache()
     {
+        // dump active cache when we something important changed
+        self::$activeCache = null;
+
         self::refreshActiveCampaignsCache();
 
         $campaign = $this->where(['id' => $this->id])->with([

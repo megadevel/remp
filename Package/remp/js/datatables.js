@@ -33,16 +33,16 @@ $.extend( $.fn.dataTable.defaults, {
         const stateParameters = getRelevantStateParameters(data);
         // encode current state to base64
         const state = rison.encode(stateParameters);
-        // get hash part of the url
-        let hashParams = new URLSearchParams(window.location.hash.substring(1));
-        // add encoded state into hash part of url
-        hashParams.set($(this).attr('id') + '_state', state);
-        // update url hash and perform url decoding, because urlsearchparams.toString method encodes it automatically
-        window.location.hash = decodeURIComponent(hashParams.toString());
+
+        let url = new URL(window.location.href);
+        url.searchParams.set($(this).attr('id') + '_state', state);
+
+        // update url and perform url decoding, because url.toString method encodes it automatically
+        window.history.pushState({}, document.title, decodeURIComponent(url.toString()));
     },
     stateLoadCallback: function (settings) {
-        const hash = new URLSearchParams(window.location.hash.substring(1));
-        let state = hash.get($(this).attr('id') + '_state');
+        const url = new URL(window.location.href);
+        let state = url.searchParams.get($(this).attr('id') + '_state');
 
         // check the current url to see if we've got a state to restore
         if (!state) {
@@ -164,25 +164,26 @@ $.fn.dataTables = {
 
     selectFilters: function (column, filterData, state) {
         // create select box
-        var select = $('<select multiple class="selectpicker" data-live-search="true" data-live-search-normalize="true"></select>')
-            .appendTo( $(column.header()) )
+        let select = $('<select multiple class="selectpicker" data-live-search="true" data-live-search-normalize="true"></select>');
+        let selectEl = select.get(0);
+
+        // add select options
+        $.each(filterData, function (value, label) {
+            let optionEl = document.createElement("option");
+            optionEl.textContent = label;
+            optionEl.value = value;
+            selectEl.appendChild(optionEl);
+        });
+
+        // restore state and append to DOM
+        select.val(state[column.index()].search.search.split(","));
+        select.appendTo( $(column.header()) )
             .on( 'change', function() {
                 column
                     .search($(this).val())
                     .draw();
-            });
-
-        // restore state and set selected options
-        var searchValues = state[column.index()].search.search.split(",");
-        $.each(filterData, function (value, label) {
-            var newOption = $('<option value="'+value+'">'+label+'</option>');
-            if (searchValues.indexOf(value) !== -1) {
-                newOption.prop("selected", true);
-            }
-            select.append(newOption);
-        });
-
-        select.selectpicker();
+            })
+            .selectpicker();
     },
 
     upsertQueryStringParam(url, key, value) {
@@ -223,12 +224,12 @@ $.fn.dataTables = {
                 if (data === null) {
                     return "";
                 }
-                return "<span class='datatable-date-render-item' title='" + moment.utc(data).local().format('LLL') + "'>" + moment.utc(data).locale('en').fromNow() + "</span>";
+                return "<span class='datatable-exportable-item' title='" + moment.utc(data).local().format('LLL') + "'>" + moment.utc(data).locale('en').fromNow() + "</span>";
             }
         },
         number: function () {
             return function(data) {
-                return Number(data).toLocaleString();
+                return "<span class='datatable-exportable-item' title='" + data + "'>" + Number(data).toLocaleString() + "</span>";
             }
         },
         percentage: function () {

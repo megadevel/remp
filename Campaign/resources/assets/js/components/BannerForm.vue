@@ -107,6 +107,31 @@
               v-bind:show="show"
             ></short-message-template>
 
+            <newsletter-rectangle-template v-if="template === 'newsletter_rectangle'"
+                                           v-bind:_templateId="newsletterRectangleTemplate.id"
+                                           v-bind:_newsletterId="newsletterRectangleTemplate.newsletterId"
+                                           v-bind:_btnSubmit="newsletterRectangleTemplate.btnSubmit"
+                                           v-bind:_title="newsletterRectangleTemplate.title"
+                                           v-bind:_text="newsletterRectangleTemplate.text"
+                                           v-bind:_success="newsletterRectangleTemplate.success"
+                                           v-bind:_failure="newsletterRectangleTemplate.failure"
+                                           v-bind:_textColor="newsletterRectangleTemplate.textColor"
+                                           v-bind:_backgroundColor="newsletterRectangleTemplate.backgroundColor"
+                                           v-bind:_buttonBackgroundColor="newsletterRectangleTemplate.buttonBackgroundColor"
+                                           v-bind:_buttonTextColor="newsletterRectangleTemplate.buttonTextColor"
+                                           v-bind:_width="newsletterRectangleTemplate.width"
+                                           v-bind:_height="newsletterRectangleTemplate.height"
+                                           v-bind:_terms="newsletterRectangleTemplate.terms"
+                                           v-bind:_endpoint="newsletterRectangleTemplate.endpoint"
+                                           v-bind:_useXhr="newsletterRectangleTemplate.useXhr"
+                                           v-bind:_requestBody="newsletterRectangleTemplate.requestBody"
+                                           v-bind:_requestHeaders="newsletterRectangleTemplate.requestHeaders"
+                                           v-bind:_paramsTransposition="newsletterRectangleTemplate.paramsTransposition"
+                                           v-bind:_paramsExtra="newsletterRectangleTemplate.paramsExtra"
+                                           v-bind:_rempMailerAddr="newsletterRectangleTemplate.rempMailerAddr"
+                                           v-bind:v-show="show"
+            ></newsletter-rectangle-template>
+
             <ul class="tab-nav m-t-30" role="tablist" data-tab-color="teal">
                 <li class="active">
                     <a href="#settings" role="tab" data-toggle="tab" aria-expanded="true">Settings</a>
@@ -150,7 +175,7 @@
                                     <label for="target_url" class="fg-label">Target URL</label>
                                     <input v-model="targetUrl" class="form-control fg-input" name="target_url" type="text" id="target_url">
                                 </div>
-                                <div><small>UTM params will be automatically appended to this link.</small></div>
+                                <div class="help-block"><small>RTM (REMP's UTM) params will be automatically appended to this link.</small></div>
                             </div>
 
                             <div class="input-group fg-float m-t-30">
@@ -161,8 +186,9 @@
                                     <small class="help-block">Custom JS is run as a function with single a function parameter <i>params</i>.
                                         Object <i>params</i> contains several properties of the banner you can access.
                                         <span data-toggle="tooltip"
-                                              data-original-title="properties: utmMedium, utmCampaign, utmContent, bannerVariant"
-                                              class="glyphicon glyphicon-question-sign"></span>
+                                              data-original-title="properties: rtmSource, rtmMedium, rtmCampaign, rtmContent, rtmVariant"
+                                              class="glyphicon glyphicon-question-sign"></span><br>
+                                        <span v-pre>You can use <i class="zmdi zmdi-code"></i> Variables in this field as <code>{{&nbsp;variable_name&nbsp;}}</code>.</span>
                                     </small>
                                 </div>
                             </div><!-- .input-group -->
@@ -173,7 +199,8 @@
                                     <label for="jsIncludesStr" class="fg-label">Javascript includes</label>
                                     <textarea v-model="jsIncludesStr" class="form-control fg-input" rows="6" name="jsIncludesStr" cols="50" id="jsIncludesStr"></textarea>
                                 </div>
-                                <div style="margin-top: 5px;">Enter include script urls separated by new line.</div>
+                                <div style="margin-top: 5px;">Enter include script urls separated by new line. <br></div>
+                                <small class="help-block" v-pre>You can use <i class="zmdi zmdi-code"></i> Variables in this field as <code>{{&nbsp;variable_name&nbsp;}}</code>.</small>
 
                                 <div v-if="jsIncludes">
                                     <input v-for="jsInclude in jsIncludes" type="hidden" name="js_includes[]" :value="jsInclude">
@@ -188,6 +215,7 @@
                                     <textarea v-model="cssIncludesStr" class="form-control fg-input" rows="6" name="cssIncludesStr" cols="50" id="cssIncludesStr"></textarea>
                                 </div>
                                 <div style="margin-top: 5px;">Enter include stylesheets urls separated by new line.</div>
+                                <small class="help-block" v-pre>You can use <i class="zmdi zmdi-code"></i> Variables in this field as <code>{{&nbsp;variable_name&nbsp;}}</code>.</small>
 
                                 <div v-if="cssIncludes">
                                     <input v-for="cssInclude in cssIncludes" type="hidden" name="css_includes[]" :value="cssInclude">
@@ -203,7 +231,7 @@
                                     <small class="help-block">
                                         Banner events (show, click, close) are tracked back to Campaign tool automatically.
                                         Enable if you need to manually control when events are fired.
-                                        To track events manually, use <i>remplib.tracker.trackEvent()</i> function.
+                                        To track events manually, use <code>remplib.tracker.trackEvent()</code> function.
                                         See <a href="https://github.com/remp2020/remp/tree/master/Beam#js-tracking-interface">documentation</a> for further details.
                                     </small>
                                 </label>
@@ -214,7 +242,7 @@
                 </div>
             </div>
 
-            <ul class="tab-nav m-t-30" role="tablist" data-tab-color="teal" :class="{ hidden: collapsibleBarTemplate != null }">
+            <ul class="tab-nav m-t-30" role="tablist" data-tab-color="teal">
                 <li v-on:click="displayType='overlay'" v-bind:class="{active: displayType === 'overlay'}">
                     <a href="#overlay-banner" role="tab" data-toggle="tab" aria-expanded="true">Overlay Banner</a>
                 </li>
@@ -223,9 +251,9 @@
                 </li>
             </ul>
 
-            <div class="card m-t-15" :class="{ hidden: collapsibleBarTemplate != null }">
+            <div class="card m-t-15">
                 <div class="tab-content p-0">
-                    <div role="tabpanel" v-bind:class="[{active: displayType === 'overlay'}, 'tab-pane']" id="overlay-banner">
+                    <div role="tabpanel" v-bind:class="[{ hidden: collapsibleBarTemplate != null, active: displayType === 'overlay'}, 'tab-pane']" id="overlay-banner">
                         <div class="card-body card-padding p-l-15">
 
                             <div class="input-group" v-if="isOverlay">
@@ -320,7 +348,7 @@
                                 </div>
                             </div>
 
-                            <div class="input-group fg-float checkbox">
+                            <div class="input-group fg-float checkbox" :class="{ hidden: collapsibleBarTemplate != null }">
                                 <label class="m-l-15">
                                     Ability to close banner manually
                                     <input v-model="closeable" value="1" name="closeable" type="checkbox">
@@ -367,6 +395,7 @@
                                         :positionOptions="positionOptions"
                                         :show="show"
                                         :template="template"
+                                        :variables="variables"
 
                                         :mediumRectangleTemplate="mediumRectangleTemplate"
                                         :overlayRectangleTemplate="overlayRectangleTemplate"
@@ -376,6 +405,7 @@
                                         :htmlOverlayTemplate="htmlOverlayTemplate"
                                         :shortMessageTemplate="shortMessageTemplate"
                                         :overlayTwoButtonsSignatureTemplate="overlayTwoButtonsSignatureTemplate"
+                                        :newsletterRectangleTemplate="newsletterRectangleTemplate"
 
                                         :position="position"
                                         :offsetVertical="offsetVertical"
@@ -414,10 +444,12 @@
     import ShortMessageTemplate from "./templates/ShortMessage";
     import OverlayRectangleTemplate from "./templates/OverlayRectangle";
     import BannerPreview from "./BannerPreview";
-    import vSelect from "remp/js/components/vSelect";
-    import FormValidator from "remp/js/components/FormValidator";
+    import vSelect from "@remp/js-commons/js/components/vSelect";
+    import FormValidator from "@remp/js-commons/js/components/FormValidator";
     import HtmlOverlayTemplate from "./templates/HtmlOverlay";
     import OverlayTwoButtonsSignatureTemplate from "./templates/OverlayTwoButtonsSignature";
+    import NewsletterRectangleTemplate from './templates/NewsletterRectangle';
+
 
     const props = {
         "_name": String,
@@ -445,10 +477,12 @@
         "_shortMessageTemplate": Object,
         "_overlayRectangleTemplate": Object,
         "_overlayTwoButtonsSignatureTemplate": Object,
+        "_newsletterRectangleTemplate": Object,
 
         "_alignmentOptions": Object,
         "_dimensionOptions": Object,
         "_positionOptions": Object,
+        "_variables": Object,
 
         "_validateUrl": String,
         "_clientSiteUrl": String,
@@ -471,7 +505,8 @@
             vSelect,
             FormValidator,
             OverlayRectangleTemplate,
-            OverlayTwoButtonsSignatureTemplate
+            OverlayTwoButtonsSignatureTemplate,
+            NewsletterRectangleTemplate
         },
         name: 'banner-form',
         props: props,
@@ -510,10 +545,12 @@
             shortMessageTemplate: null,
             overlayRectangleTemplate: null,
             overlayTwoButtonsSignatureTemplate: null,
+            newsletterRectangleTemplate: null,
 
             alignmentOptions: [],
             dimensionOptions: [],
             positionOptions: [],
+            variables: {},
             show: true,
 
             submitAction: null,
@@ -534,7 +571,7 @@
             cssIncludes: null,
             manualEventsTracking: null,
 
-            fieldParamsMessage: "UTM params will be automatically appended to every link in this field.<br> If you want to add custom parameter to specific link: add data-param-* attribute. e.g.: data-param-foo=\"baz\""
+            fieldParamsMessage: "RTM (REMP's UTM) params will be automatically appended to every link in this field.<br> If you want to add custom parameter to specific link: add <code>data-param-*</code> attribute. e.g.: <code>data-param-foo=\"baz\"</code>"
         }),
         computed: {
             isOverlay: function() {

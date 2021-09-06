@@ -2,10 +2,11 @@
 
 namespace App\Console\Commands;
 
+use Illuminate\Support\Str;
 use Carbon\Carbon;
 use GuzzleHttp\Client;
 use GuzzleHttp\Exception\ClientException;
-use Illuminate\Console\Command;
+use App\Console\Command;
 
 class ElasticDataRetention extends Command
 {
@@ -19,15 +20,15 @@ class ElasticDataRetention extends Command
     {
         if (!$this->input->getOption('host')) {
             $this->line('<error>ERROR</error> You need to provide <info>--host</info> option with address to your Elastic instance (e.g. <info>--host=http://localhost:9200</info>)');
-            return;
+            return 1;
         }
         if (!$this->input->getOption('match-index')) {
             $this->line('<error>ERROR</error> You need to provide <info>--match-index</info> option with name of the index you want to cleanup (e.g. <info>--write-alias=pageviews_write</info>)');
-            return;
+            return 1;
         }
         if (!$this->input->getOption('date')) {
             $this->line('<error>ERROR</error> You need to provide <info>--date</info> option with date that will be searched within index name (e.g. <info>--date="90 days ago"</info>)');
-            return;
+            return 1;
         }
 
         $date = new Carbon($this->input->getOption('date'));
@@ -35,6 +36,9 @@ class ElasticDataRetention extends Command
             'base_uri' => $this->input->getOption('host'),
         ]);
 
+        $this->line('');
+        $this->info('**** ' . self::COMMAND . ' (date: ' . (new Carbon())->format(DATE_RFC3339) . ') ****');
+        
         $targetIndices = sprintf(
             "/%s*%s*",
             $this->input->getOption('match-index'),
@@ -42,17 +46,18 @@ class ElasticDataRetention extends Command
         );
 
         $this->line(sprintf(
-            "Executing data retention for <info>%s%s</info>:",
+            "Executing data retention for <info>%s%s</info> (date: %s)",
             $this->input->getOption('host'),
-            $targetIndices
+            $targetIndices,
+            $this->input->getOption('date')
         ));
 
         $options = [];
         if ($this->input->getOption('auth')) {
             $auth = $this->input->getOption('auth');
-            if (!str_contains($auth, ':')) {
+            if (!Str::contains($auth, ':')) {
                 $this->line("<error>ERROR</error> You need to provide <info>--auth</info> option with a name and a password (to Elastic instance) separated by ':', e.g. admin:password");
-                return;
+                return 1;
             }
 
             [$user, $pass] = explode(':', $auth, 2);
@@ -65,11 +70,13 @@ class ElasticDataRetention extends Command
         try {
             $client->delete($targetIndices, $options);
         } catch (ClientException $e) {
-            $body = json_decode($e->getResponse()->getBody());
-            dump($body);
-            return;
+            //$body = json_decode($e->getResponse()->getBody());
+            //dump($body);
+            $this->line("<error>ERROR</error> Client exception: " . $e->getMessage());
+            return 2;
         }
 
-        $this->line('  * Done.');
+        $this->line('  * Done, index deleted.');
+        return 0;
     }
 }

@@ -2,11 +2,14 @@
 
 namespace App;
 
+use App\Model\BaseModel;
+use Illuminate\Database\Eloquent\Factories\HasFactory;
 use App\Model\Aggregable;
-use Illuminate\Database\Eloquent\Model;
 
-class SessionReferer extends Model implements Aggregable
+class SessionReferer extends BaseModel implements Aggregable
 {
+    use HasFactory;
+
     public $timestamps = false;
 
     protected $casts = [

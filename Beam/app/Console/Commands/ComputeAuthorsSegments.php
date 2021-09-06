@@ -12,7 +12,7 @@ use App\SegmentBrowser;
 use App\SegmentGroup;
 use App\SegmentUser;
 use Carbon\Carbon;
-use Illuminate\Console\Command;
+use App\Console\Command;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Mail;
 use PDO;
@@ -31,11 +31,12 @@ class ComputeAuthorsSegments extends Command
     private $minViews;
     private $minAverageTimespent;
     private $minRatio;
+    private $historyDays;
     private $dateThreshold;
 
     protected $signature = self::COMMAND . ' 
-    {--email} 
-    {--history}
+    {--email=} 
+    {--history=}
     {--min_views=} 
     {--min_average_timespent=} 
     {--min_ratio=}';
@@ -44,7 +45,6 @@ class ComputeAuthorsSegments extends Command
 
     public function handle()
     {
-        ini_set('memory_limit', '512M');
         // Using Cursor on large number of results causing memory issues
         // https://github.com/laravel/framework/issues/14919
         DB::connection()->getPdo()->setAttribute(PDO::MYSQL_ATTR_USE_BUFFERED_QUERY, false);
@@ -55,10 +55,20 @@ class ComputeAuthorsSegments extends Command
 
         $email = $this->option('email');
 
+        $historyDays = $this->option('history');
+        if ($historyDays === null) {
+            $historyDays = Config::loadByName(ConfigNames::SECTION_SEGMENTS_DAYS_IN_PAST);
+        }
+        if (!in_array($historyDays, [30,60,90])) {
+            $this->output->writeln('<error>ERROR</error> Invalid --history value provided (allowed values are 30, 60, 90): ' . $historyDays);
+            return 1;
+        }
+
         $this->minViews = Config::loadByName(ConfigNames::AUTHOR_SEGMENTS_MIN_VIEWS);
         $this->minAverageTimespent = Config::loadByName(ConfigNames::AUTHOR_SEGMENTS_MIN_AVERAGE_TIMESPENT);
         $this->minRatio = Config::loadByName(ConfigNames::AUTHOR_SEGMENTS_MIN_RATIO);
-        $this->dateThreshold = Carbon::today()->subDays(Config::loadByName(ConfigNames::AUTHOR_SEGMENTS_DAYS_IN_PAST));
+        $this->historyDays = $historyDays;
+        $this->dateThreshold = Carbon::today()->subDays($historyDays);
 
         if ($email) {
             // Only compute segment statistics
@@ -77,6 +87,7 @@ class ComputeAuthorsSegments extends Command
         }
 
         $this->line(' <info>OK!</info>');
+        return 0;
     }
 
     /**
@@ -87,12 +98,11 @@ class ComputeAuthorsSegments extends Command
         $minimalViews = $this->option('min_views') ?? $this->minViews;
         $minimalAverageTimespent = $this->option('min_average_timespent') ?? $this->minAverageTimespent;
         $minimalRatio = $this->option('min_ratio') ?? $this->minRatio;
-        $historyDays = $this->option('history') ?? 30;
 
         $results = [];
-        $fromDay = Carbon::now()->subDays($historyDays)->toDateString();
+        $fromDay = $this->dateThreshold->toDateString();
         // only 30, 60 and 90 are allowed values
-        $columnDays = 'total_views_last_' . $historyDays .'_days';
+        $columnDays = 'total_views_last_' . $this->historyDays .'_days';
 
         $this->line("running browsers query");
 
@@ -158,16 +168,19 @@ SQL;
         }
 
         Mail::to($email)->send(
-            new AuthorSegmentsResult($results, $minimalViews, $minimalAverageTimespent, $minimalRatio, $historyDays)
+            new AuthorSegmentsResult($results, $minimalViews, $minimalAverageTimespent, $minimalRatio, $this->historyDays)
         );
     }
 
     private function recomputeUsersForAuthorSegments()
     {
+        SegmentUser::whereHas('segment.segmentGroup', function ($q) {
+            $q->where('code', '=', SegmentGroup::CODE_AUTHORS_SEGMENTS);
+        })->delete();
+
         $authorUsers = $this->groupDataFor('user_id');
 
         $this->line("Updating segments users");
-        SegmentUser::truncate();
 
         foreach ($authorUsers as $authorId => $users) {
             if (count($users) === 0) {
@@ -191,9 +204,11 @@ SQL;
 
     private function recomputeBrowsersForAuthorSegments()
     {
-        $authorBrowsers = $this->groupDataFor('browser_id');
+        SegmentBrowser::whereHas('segment.segmentGroup', function ($q) {
+            $q->where('code', '=', SegmentGroup::CODE_AUTHORS_SEGMENTS);
+        })->delete();
 
-        SegmentBrowser::truncate();
+        $authorBrowsers = $this->groupDataFor('browser_id');
 
         $this->line("Updating segments browsers");
 

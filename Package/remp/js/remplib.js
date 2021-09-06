@@ -8,11 +8,25 @@ export default {
 
     userSubscribed: null,
 
+    subscriptionIds: [],
+
     browserId: null,
 
-    cacheThreshold: 15 * 60000, // 15 minutes
-
     rempSessionIDKey: "remp_session_id",
+
+    commerceSessionIDKey: "commerce_session_id",
+
+    storage: "local_storage", // "cookie", "local_storage"
+
+    internalStorageKeys: null,
+
+    storageExpiration: {
+        "default": 15,
+        "keys": {
+            "browser_id": 1051200, // 2 years in minutes
+            "campaigns": 1051200,
+        }
+    },
 
     cookieDomain: null,
 
@@ -22,6 +36,61 @@ export default {
 
     usingAdblock: null,
 
+    init: function(config) {
+        if (typeof config.userId !== 'undefined' && config.userId !== null) {
+            remplib.userId = config.userId;
+        }
+        if (typeof config.userSubscribed !== 'undefined' && config.userSubscribed !== null) {
+            remplib.userSubscribed = config.userSubscribed;
+        }
+        if (config.subscriptionIds instanceof Array) {
+            remplib.subscriptionIds = config.subscriptionIds;
+        }
+        if (typeof config.browserId !== 'undefined' && config.browserId !== null) {
+            remplib.browserId = config.browserId;
+        }
+
+        if (typeof config.cookieDomain === 'string') {
+            remplib.cookieDomain = config.cookieDomain;
+        }
+
+        if (typeof config.storage === 'string') {
+            if (['cookie', 'local_storage'].indexOf(config.storage) === -1) {
+                console.warn('remplib: storage type `' + config.storage + '` is not supported, falling back to `local_storage`');
+            } else {
+                remplib.storage = config.storage;
+            }
+        }
+        if (!this.localStorageIsAvailable()) {
+            console.warn('remplib: local storage is not available in this browser, falling back to `cookie`');
+            remplib.storage = 'cookie';
+        }
+
+        if (typeof config.storageExpiration === 'object') {
+            if (config.storageExpiration.default) {
+                remplib.storageExpiration.default = config.storageExpiration.default;
+            }
+            if (config.storageExpiration.keys) {
+                remplib.storageExpiration.keys = {
+                    ...remplib.storageExpiration.keys,
+                    ...config.storageExpiration.keys
+                };
+            }
+        }
+
+        remplib.internalStorageKeys = remplib.internalStorageKeys || {};
+
+        remplib.internalStorageKeys["browser_id"] = true;
+        remplib.internalStorageKeys[remplib.rempSessionIDKey] = true;
+        remplib.internalStorageKeys[remplib.rempPageviewIDKey] = true;
+        remplib.internalStorageKeys[remplib.commerceSessionIDKey] = true;
+        remplib.internalStorageKeys["rtm_source"] = true;
+        remplib.internalStorageKeys["rtm_medium"] = true;
+        remplib.internalStorageKeys["rtm_campaign"] = true;
+        remplib.internalStorageKeys["rtm_content"] = true;
+        remplib.internalStorageKeys["rtm_variant"] = true;
+    },
+
     getUserId: function() {
         return this.userId;
     },
@@ -30,56 +99,37 @@ export default {
         return this.userSubscribed;
     },
 
+    getSubscriptionIds: function() {
+        return this.subscriptionIds;
+    },
+
     getBrowserId: function() {
         if (this.browserId) {
             return this.browserId;
         }
 
         let storageKey = "browser_id";
-        let browserId = this.getFromStorage(storageKey, true, true);
+        let browserId = this.getFromStorage(storageKey);
         if (browserId) {
             return browserId;
-        }
-
-        // this section is added for historical reasons and migration of value
-        // it will be removed within next couple of weeks
-        let deprecatedStorageKey = "anon_id";
-        let anonId = this.getFromStorage(deprecatedStorageKey, true, true);
-        if (anonId) {
-            browserId = anonId;
-            this.removeFromStorage(deprecatedStorageKey);
         }
 
         if (!browserId) {
             browserId = remplib.uuidv4();
         }
 
-        let now = new Date();
-        let item = {
-            "version": 1,
-            "value": browserId,
-            "createdAt": now,
-            "updatedAt": now,
-        };
-        this.setToStorage(storageKey, item);
+        this.setToStorage(storageKey, browserId);
         return browserId;
     },
 
     getRempSessionID: function() {
         const storageKey = this.rempSessionIDKey;
-        let rempSessionID = this.getFromStorage(storageKey, false, true);
+        let rempSessionID = this.getFromStorage(storageKey);
         if (rempSessionID) {
             return rempSessionID;
         }
         rempSessionID = remplib.uuidv4();
-        const now = new Date();
-        let item = {
-            "version": 1,
-            "value": rempSessionID,
-            "createdAt": now,
-            "updatedAt": now,
-        };
-        this.setToStorage(storageKey, item);
+        this.setToStorage(storageKey, rempSessionID);
         return rempSessionID;
     },
 
@@ -89,6 +139,26 @@ export default {
         }
         this.rempPageviewID = remplib.uuidv4();
         return this.rempPageviewID;
+    },
+
+    resetRempPageviewID: function() {
+        this.rempPageviewID = remplib.uuidv4();
+    },
+
+    getCommerceSessionID: function() {
+        let commerceSessionID = this.getFromStorage(this.commerceSessionIDKey);
+        if (commerceSessionID) {
+            return commerceSessionID;
+        }
+
+        throw "remplib: commerce_session_id not found. It has to be generated in the checkout step.";
+    },
+
+    generateCommerceSessionID: function() {
+        let commerceSessionIDKey = remplib.uuidv4();
+        this.setToStorage(this.commerceSessionIDKey, commerceSessionIDKey);
+
+        return commerceSessionIDKey;
     },
 
     uuidv4: function() {
@@ -109,102 +179,186 @@ export default {
         });
     },
 
-    setToStorage: function(key, item) {
-        localStorage.setItem(key, JSON.stringify(item));
+    lifetimeInMinutes: function(key) {
+        if (this.storageExpiration['keys'][key]) {
+            return this.storageExpiration['keys'][key];
+        }
+        return this.storageExpiration['default'];
+    },
 
-        // clone value of item also to cookie
-        let value = item;
-        if (item.hasOwnProperty('value')) {
-            value = item.value;
+    setToStorage: function(key, value) {
+        if (typeof remplib.internalStorageKeys[key] === 'undefined' && typeof remplib.storageExpiration['keys'][key] === 'undefined') {
+            console.warn('remplib: Ignoring attempt to store "' + key + '" to the storage. Only internal keys and keys with explicit rempConfig.storageExpiration are allowed.');
+            return;
         }
-        const now = new Date();
-        let cookieExp = new Date();
-        cookieExp.setTime(now.getTime() + this.cacheThreshold);
-        const expires = "; expires=" + cookieExp.toUTCString();
-        let domain = "";
-        if (this.cookieDomain !== null) {
-            domain = "; domain=" + this.cookieDomain;
+        let now = new Date();
+        let serializedItem = JSON.stringify({
+            "version": 1,
+            "value": value,
+            "updatedAt": now
+        });
+
+        if (this.storage === 'local_storage') {
+            localStorage.setItem(key, serializedItem);
         }
-        document.cookie = key + "=" + value + expires + "; path=/"+ domain + ";";
+        let expireAt = new Date(now.getTime() + (this.lifetimeInMinutes(key) * 60000));
+        this.storeCookie(key, value, expireAt);
     },
 
     /**
-     * Tries to retrieve key's value from localStorage
+     * Tries to retrieve key's value from storage (local/cookie)
      * Side effect of this function is an extension of key's lifetime in the storage
      * @param key
-     * @param bypassExpireThreshold ignore key's value expiration (given by cacheThreshold)
-     * @param storeToCookie
      * @returns {*}
      */
-    getFromStorage: function(key, bypassExpireThreshold, storeToCookie) {
+    getFromStorage: function(key) {
         let now = new Date();
+
+        let expireInMinutes = this.storageExpiration['default'];
+        if (this.storageExpiration['keys'][key]) {
+            expireInMinutes = this.storageExpiration['keys'][key];
+        }
+
+        let value = null;
+        if (this.storage === 'local_storage') {
+            value = this._getFromLocalStorage(key, now, expireInMinutes);
+            if (value) {
+                return value;
+            }
+        }
+
+        // universal fallback
+        value = this.getCookie(key);
+        if (value) {
+            let expireAt = new Date(now.getTime() + expireInMinutes * 60000);
+            this.storeCookie(key, value, expireAt);
+            return value;
+        }
+
+        // Migration from local storage to cookie (e.g. campaigns_session). We got here because we didn't find value
+        // in the cookie. It might be present in the local_storage.
+        if (this.storage === 'cookie' && this.localStorageIsAvailable()) {
+            value = this._getFromLocalStorage(key, now, expireInMinutes);
+        }
+
+        return value;
+    },
+
+    // Recommended check that localStorage is available AND usable
+    // https://developer.mozilla.org/en-US/docs/Web/API/Web_Storage_API/Using_the_Web_Storage_API#testing_for_availability
+    localStorageIsAvailable: function() {
+        var storage;
+        try {
+            storage = window['localStorage'];
+            var x = '__storage_test__';
+            storage.setItem(x, x);
+            storage.removeItem(x);
+            return true;
+        }
+        catch(e) {
+            return e instanceof DOMException && (
+                // everything except Firefox
+                e.code === 22 ||
+                // Firefox
+                e.code === 1014 ||
+                // test name field too, because code might not be present
+                // everything except Firefox
+                e.name === 'QuotaExceededError' ||
+                // Firefox
+                e.name === 'NS_ERROR_DOM_QUOTA_REACHED') &&
+                // acknowledge QuotaExceededError only if there's something already stored
+                (storage && storage.length !== 0);
+        }
+    },
+
+    // private method
+    _getFromLocalStorage: function(key, now, expireInMinutes) {
         let data = localStorage.getItem(key);
-        if (data === null) {
+        if (!data) {
             return null;
         }
 
-        let item = JSON.parse(data);
-        let threshold = new Date(now.getTime() - this.cacheThreshold);
-        if (!bypassExpireThreshold && (new Date(item.updatedAt)).getTime() < threshold.getTime()) {
-            localStorage.removeItem(key);
+        let item = null;
+        try {
+            item = JSON.parse(data);
+            if (!item.hasOwnProperty("updatedAt") || !item.hasOwnProperty('version')) {
+                // This might not be our value, or it's just not migrated yet. Returning what we've found.
+                return data;
+            }
+        } catch (e) {
+            // There wasn't a JSON, definitely not our value. Returning what we've found.
+            return data;
+        }
+
+        let itemExpirationDate = new Date(new Date(item.updatedAt).getTime() + (expireInMinutes * 60000));
+        if (itemExpirationDate < now) {
+            this.removeFromStorage(key);
             return null;
         }
 
-        if (item.hasOwnProperty("updatedAt")) {
-            item.updatedAt = now;
-        }
-
-        if (storeToCookie) {
-            this.setToStorage(key, item);
-        } else {
-            localStorage.setItem(key, JSON.stringify(item));
-        }
-
+        let value = null;
         if (item.hasOwnProperty('value')) {
-            return item.value;
+            value = item.value;
+        } else if (item.hasOwnProperty('values')) {
+            // inconsistency failsave :(
+            value = item.values;
         }
-        return item;
+
+        if (typeof value === "object") {
+            // To be compatible with cookie storage, we only accept strings as values. This is backwards
+            // compatibility action to maintain existing objects.
+            value = JSON.stringify(value);
+        }
+
+        // SIDE-EFFECT: update "updatedAt" to extend local storage expiration
+        item.updatedAt = now;
+        localStorage.setItem(key, JSON.stringify(item));
+
+        // SIDE-EFFECT: update fallback cookie expiration
+        let expireAt = new Date(now.getTime() + (this.lifetimeInMinutes(key) * 60000));
+        this.storeCookie(key, value, expireAt);
+
+        return value;
     },
 
     removeFromStorage: function(key) {
         localStorage.removeItem(key);
-
-        let cookieExp = new Date();
-        const expires = "; expires=" + cookieExp.toUTCString();
-        let domain = "";
-        if (this.cookieDomain !== null) {
-            domain = "; domain=" + this.cookieDomain;
-        }
-        document.cookie = key + "=" + expires + "; path=/"+ domain + ";";
+        this.removeCookie(key);
     },
 
-    // jquery extend
+    getCookie: function(name) {
+        let result = document.cookie.match(new RegExp(name + '=([^;]+)'));
+        if (!result) {
+            return null;
+        }
+        return result[1];
+    },
+
+    storeCookie: function(name, value, expires) {
+        if (!value || value.length === 0) {
+            return;
+        }
+        document.cookie = [
+            name, '=', value,
+            '; expires=', expires.toUTCString(),
+            '; domain=', this.cookieDomain,
+            '; path=/; SameSite=Lax'
+        ].join('');
+    },
+
+    removeCookie: function(name) {
+        document.cookie = [
+            name, '=; expires=Thu, 01-Jan-1970 00:00:01 GMT; path=/; domain=; SameSite=Lax',
+            this.cookieDomain
+        ].join('');
+    },
+
+    // simplified jquery extend (without deep copy, not copying null values)
     extend: function () {
-        var options, name, src, copy, copyIsArray, clone,
+        var options, name, copy,
             target = arguments[0] || {},
             i = 1,
-            length = arguments.length,
-            deep = false;
-
-        // Handle a deep copy situation
-        if (typeof target === "boolean") {
-            deep = target;
-
-            // Skip the boolean and the target
-            target = arguments[i] || {};
-            i++;
-        }
-
-        // Handle case when target is a string or something (possible in deep copy)
-        if (typeof target !== "object" && !isFunction(target)) {
-            target = {};
-        }
-
-        // Extend jQuery itself if only one argument is passed
-        if (i === length) {
-            target = this;
-            i--;
-        }
+            length = arguments.length;
 
         for (; i < length; i++) {
 
@@ -220,27 +374,8 @@ export default {
                     if (name === "__proto__" || target === copy) {
                         continue;
                     }
-
-                    // Recurse if we're merging plain objects or arrays
-                    if (deep && copy && (jQuery.isPlainObject(copy) ||
-                        (copyIsArray = Array.isArray(copy)))) {
-                        src = target[name];
-
-                        // Ensure proper type for the source value
-                        if (copyIsArray && !Array.isArray(src)) {
-                            clone = [];
-                        } else if (!copyIsArray && !jQuery.isPlainObject(src)) {
-                            clone = {};
-                        } else {
-                            clone = src;
-                        }
-                        copyIsArray = false;
-
-                        // Never move original objects, clone them
-                        target[name] = jQuery.extend(deep, clone, copy);
-
-                        // Don't bring in undefined values
-                    } else if (copy !== undefined) {
+                    // Don't bring in undefined or null values
+                    if (copy !== undefined && copy !== null) {
                         target[name] = copy;
                     }
                 }
@@ -260,22 +395,16 @@ export default {
             app.run();
             return;
         }
-        for (let i=0; i < app._.length; i++) {
-            let cb = app._[i];
-            setTimeout((function() {
-                let cbf = cb[0];
-                let cbargs = cb[1];
-                return function() {
-                    if (cbf !== "run") {
-                        app[cbf].apply(app, cbargs);
-                    }
-                    app.initIterator = app.initIterator+1 || 1;
-                    if (app.initIterator === app._.length) {
-                        app.run();
-                    }
-                }
-            })(), 0);
+        while (app._.length) {
+            let cb = app._.shift();
+            let cbf = cb[0];
+            let cbargs = cb[1];
+
+            if (cbf !== "run") {
+                app[cbf].apply(app, cbargs);
+            }
         }
+        app.run();
     },
 
     applyPolyfills: function() {

@@ -2,14 +2,14 @@
 
 namespace App;
 
+use App\Model\BaseModel;
+use Illuminate\Database\Eloquent\Factories\HasFactory;
 use App\Model\Aggregable;
-use Carbon\Carbon;
-use DB;
-use Illuminate\Database\Eloquent\Model;
-use Illuminate\Support\Collection;
 
-class ArticlePageviews extends Model implements Aggregable
+class ArticlePageviews extends BaseModel implements Aggregable
 {
+    use HasFactory;
+
     public $timestamps = false;
 
     protected $fillable = [

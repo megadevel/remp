@@ -1,26 +1,32 @@
 <?php
+declare(strict_types=1);
+
 namespace Tests\Unit\Generator;
 
 use PHPUnit\Framework\TestCase;
-use Remp\MailerModule\Generators\ArticleLocker;
-use Remp\MailerModule\Generators\EmbedParser;
-use Remp\MailerModule\Generators\NewsfilterGenerator;
-use Remp\MailerModule\Generators\WordpressHelpers;
-use Remp\MailerModule\PageMeta\ContentInterface;
-use Remp\MailerModule\Repository\SourceTemplatesRepository;
+use Remp\MailerModule\Models\ContentGenerator\Engine\EngineFactory;
+use Remp\MailerModule\Models\Generators\ArticleLocker;
+use Remp\MailerModule\Models\Generators\EmbedParser;
+use Remp\Mailer\Models\Generators\NewsfilterGenerator;
+use Remp\MailerModule\Models\Generators\WordpressHelpers;
+use Remp\MailerModule\Models\PageMeta\Content\ContentInterface;
+use Remp\MailerModule\Repositories\SourceTemplatesRepository;
 
 class NewsfilterGeneratorTest extends TestCase
 {
     private $generator;
 
-    protected function setUp()
+    protected function setUp(): void
     {
+        $engineFactory = $GLOBALS['container']->getByType(EngineFactory::class);
+
         $this->generator = new NewsfilterGenerator(
             $this->createMock(SourceTemplatesRepository::class),
             $this->createMock(WordpressHelpers::class),
             $this->createMock(ContentInterface::class),
             $this->createMock(EmbedParser::class),
-            $this->createMock(ArticleLocker::class)
+            $this->createMock(ArticleLocker::class),
+            $engineFactory
         );
     }
 
@@ -28,6 +34,7 @@ class NewsfilterGeneratorTest extends TestCase
     {
         $wpJson = <<<EOD
 {
+    "sender_email": "Jon Snow <user@example.com>",
     "post_authors": [
         {
             "user_url": "http:\/\/localhost\/dnwp\/wordpress\/autor\/ria-gehrerova\/",
@@ -66,10 +73,11 @@ EOD;
         $data = json_decode($wpJson);
 
         $output = $this->generator->preprocessParameters($data);
+        self::assertEquals("Jon Snow <user@example.com>", $output->from);
         self::assertEquals("Matej Sajfa Cifra: Mladí dnes chcú byť za pol roka slávni, mňa si v rádiu prvé štyri roky ani nevšimli", $output->title);
         self::assertEquals("Ria Gehrerová", $output->editor);
         self::assertEquals("http://localhost/dnwp/wordpress/1084435/matej-sajfa-cifra-mladi-dnes-chcu-byt-za-pol-roka-slavni-mna-si-v-radiu-prve-styri-roky-ani-nevsimli/", $output->url);
-        self::assertContains("Matej Cifra sa nedohodol s televíziami a tak", $output->summary);
-        self::assertContains("ako zarábajú slovenskí youtuberi", $output->newsfilter_html);
+        self::assertStringContainsString("Matej Cifra sa nedohodol s televíziami a tak", $output->summary);
+        self::assertStringContainsString("ako zarábajú slovenskí youtuberi", $output->newsfilter_html);
     }
 }

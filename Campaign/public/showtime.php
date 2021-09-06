@@ -4,10 +4,14 @@ use Airbrake\MonologHandler;
 use App\Banner;
 use App\Campaign;
 use App\CampaignBanner;
+use App\Contracts\SegmentAggregator;
 use App\Http\Showtime\LazyDeviceDetector;
 use App\Http\Showtime\LazyGeoReader;
 use App\Http\Showtime\Showtime;
 use App\Http\Showtime\ShowtimeResponse;
+use Illuminate\Support\HtmlString;
+use Illuminate\Support\Str;
+use Monolog\Formatter\LineFormatter;
 use Monolog\Logger;
 
 require_once __DIR__ . '/../vendor/autoload.php';
@@ -33,8 +37,74 @@ function public_path($path = '') {
     return __DIR__ .($path ? DIRECTORY_SEPARATOR.ltrim($path, DIRECTORY_SEPARATOR) : $path);
 }
 
+/**
+ * Note: mix overrides Laravel's helper function to prevent usage of Laravel's app()
+ * Get the path to a versioned Mix file.
+ *
+ * @param  string  $path
+ * @param  string  $manifestDirectory
+ * @return HtmlString|string
+ *
+ * @throws \Exception
+ */
+function mix($path, $manifestDirectory = '')
+{
+    static $manifests = [];
+
+    if (! Str::startsWith($path, '/')) {
+        $path = "/{$path}";
+    }
+
+    if ($manifestDirectory && ! Str::startsWith($manifestDirectory, '/')) {
+        $manifestDirectory = "/{$manifestDirectory}";
+    }
+
+    if (file_exists(public_path($manifestDirectory.'/hot'))) {
+        $url = rtrim(file_get_contents(public_path($manifestDirectory.'/hot')));
+
+        if (Str::startsWith($url, ['http://', 'https://'])) {
+            return new HtmlString(Str::after($url, ':').$path);
+        }
+
+        return new HtmlString("//localhost:8080{$path}");
+    }
+
+    $manifestPath = public_path($manifestDirectory.'/mix-manifest.json');
+
+    if (! isset($manifests[$manifestPath])) {
+        if (! file_exists($manifestPath)) {
+            throw new Exception('The Mix manifest does not exist.');
+        }
+
+        $manifests[$manifestPath] = json_decode(file_get_contents($manifestPath), true);
+    }
+
+    $manifest = $manifests[$manifestPath];
+
+    if (! isset($manifest[$path])) {
+        $exception = new Exception("Unable to locate Mix file: {$path}.");
+
+        if (! app('config')->get('app.debug')) {
+            report($exception);
+
+            return $path;
+        } else {
+            throw $exception;
+        }
+    }
+
+    return new HtmlString($manifestDirectory.$manifest[$path]);
+}
+
 class PlainPhpShowtimeResponse implements ShowtimeResponse
 {
+    public function jsonResponse($response, $statusCode = 400) {
+        header('Content-Type: application/json');
+        http_response_code($statusCode);
+        echo json_encode($response);
+        exit;
+    }
+
     /**
      * @param string $callback jsonp callback name
      * @param array $response response to be json-encoded and returned
@@ -55,37 +125,42 @@ class PlainPhpShowtimeResponse implements ShowtimeResponse
         ], $statusCode);
     }
 
-    public function success(string $callback, $data, $activeCampaignUuids, $providerData)
+    public function success(string $callback, $data, $activeCampaigns, $providerData)
     {
         $this->jsonpResponse($callback, [
             'success' => true,
             'errors' => [],
             'data' => empty($data) ? [] : $data,
-            'activeCampaignIds' => $activeCampaignUuids,
+            'activeCampaignIds' => array_column($activeCampaigns, 'uuid'),
+            'activeCampaigns' => $activeCampaigns,
             'providerData' => $providerData,
         ]);
     }
 
-    public function renderCampaign(CampaignBanner $variant, Campaign $campaign, array $alignments, array $dimensions, array $positions): string {
-        return $this->renderInternal($variant->banner, $variant->uuid, $campaign->uuid, (int) $variant->controlGroup, $alignments, $dimensions, $positions);
+    public function renderCampaign(CampaignBanner $variant, Campaign $campaign, array $alignments, array $dimensions, array $positions, array $variables): string {
+        return $this->renderInternal($variant->banner, $variant->uuid, $campaign->uuid, (int) $variant->control_group, $alignments, $dimensions, $positions, $variables, $variant->public_id, $campaign->public_id);
     }
 
-    public function renderBanner(Banner $banner, array $alignments, array $dimensions, array $positions): string {
-        return $this->renderInternal($banner, null, null, 0, $alignments, $dimensions, $positions);
+    public function renderBanner(Banner $banner, array $alignments, array $dimensions, array $positions, array $variables): string {
+        return $this->renderInternal($banner, null, null, 0, $alignments, $dimensions, $positions, $variables, null, null);
     }
 
     private function renderInternal(
-        Banner $banner,
+        ?Banner $banner,
         $variantUuid,
         $campaignUuid,
         $isControlGroup,
         $alignments,
         $dimensions,
-        $positions) {
-
+        $positions,
+        $variables,
+        $variantPublicId,
+        $campaignPublicId
+    ) {
         $alignmentsJson = json_encode($alignments);
         $dimensionsJson = json_encode($dimensions);
         $positionsJson = json_encode($positions);
+        $variablesJson = json_encode($variables);
 
         $bannerJs = asset(mix('/js/banner.js', '/assets/lib'));
 
@@ -94,6 +169,7 @@ class PlainPhpShowtimeResponse implements ShowtimeResponse
         } else {
             $js = "
 var bannerUuid = '{$banner->uuid}';
+var bannerPublicId = '{$banner->public_id}';
 var bannerId = 'b-' + bannerUuid;
 var bannerJsonData = {$banner->toJson()};
 ";
@@ -101,14 +177,18 @@ var bannerJsonData = {$banner->toJson()};
 
         if ($variantUuid) {
             $js .= "var variantUuid = '{$variantUuid}';\n";
+            $js .= "var variantPublicId = '{$variantPublicId}';\n";
         } else {
             $js .= "var variantUuid = null;\n";
+            $js .= "var variantPublicId = null;\n";
         }
 
         if ($campaignUuid) {
             $js .= "var campaignUuid = '{$campaignUuid}';\n";
+            $js .= "var campaignPublicId = '{$campaignPublicId}';\n";
         } else {
             $js .= "var campaignUuid = null;\n";
+            $js .= "var campaignPublicId = null;\n";
         }
 
         $js .= <<<JS
@@ -130,6 +210,7 @@ var run = function() {
     var alignments = JSON.parse('{$alignmentsJson}');
     var dimensions = JSON.parse('{$dimensionsJson}');
     var positions = JSON.parse('{$positionsJson}');
+    var variables = {$variablesJson};
 
     if (!isControlGroup) {
         banner = remplib.banner.fromModel(bannerJsonData);
@@ -139,11 +220,18 @@ var run = function() {
     banner.alignmentOptions = alignments;
     banner.dimensionOptions = dimensions;
     banner.positionOptions = positions;
+    banner.variables = variables;
 
     banner.campaignUuid = campaignUuid;
+    banner.campaignPublicId = campaignPublicId;
     banner.variantUuid = variantUuid;
-    banner.uuid = bannerUuid;
+    banner.variantPublicId = variantPublicId;
     
+    if (bannerUuid) {
+        banner.uuid = bannerUuid;
+        banner.publicId = bannerPublicId;    
+    }
+
     if (typeof remplib.campaign.bannerUrlParams !== "undefined") {
         banner.urlParams = remplib.campaign.bannerUrlParams;
     }
@@ -174,35 +262,41 @@ var run = function() {
 
     setTimeout(function() {
         var event = {
-            utm_source: "remp_campaign",
-            utm_medium: banner.displayType,
-            utm_content: banner.uuid
+            rtm_source: "remp_campaign",
+            rtm_medium: banner.displayType,
+            rtm_content: banner.uuid
         };
-        
+
         if (banner.campaignUuid) {
-            event.utm_campaign = banner.campaignUuid; 
+            event.rtm_campaign = banner.campaignUuid;
         }
         if (banner.variantUuid) {
-            event.banner_variant = banner.variantUuid; 
+            event.rtm_variant = banner.variantUuid;
         }
-        
+
         if (!banner.manualEventsTracking) {
-            remplib.tracker.trackEvent("banner", "show", null, null, event);    
+            remplib.tracker.trackEvent("banner", "show", null, null, event);
         }
-        
+
         banner.show = true;
         if (banner.closeTimeout) {
             setTimeout(function() {
                 banner.show = false;
             }, banner.closeTimeout);
         }
-        
+
         if (banner.campaignUuid && banner.variantUuid) {
-            remplib.campaign.handleBannerDisplayed(banner.campaignUuid, banner.uuid, banner.variantUuid);    
+            remplib.campaign.handleBannerDisplayed(banner.campaignUuid, banner.uuid, banner.variantUuid, banner.campaignPublicId, banner.publicId, banner.variantPublicId);
         }
-        
+
+        if (typeof resolve !== "undefined") {
+            resolve(true);
+        }
+
     }, banner.displayDelay);
-};
+}
+
+run();
 
 for (var i=0; i<scripts.length; i++) {
     remplib.loadScript(scripts[i], function() {
@@ -210,6 +304,7 @@ for (var i=0; i<scripts.length; i++) {
         run();
     });
 }
+
 for (i=0; i<styles.length; i++) {
     remplib.loadStyle(styles[i], function() {
         waiting -= 1;
@@ -222,14 +317,17 @@ JS;
     }
 }
 
-header('Content-Type: application/javascript');
-
-$dotenv = new \Dotenv\Dotenv(__DIR__ . '/../');
+$dotenv = \Dotenv\Dotenv::createImmutable(__DIR__ . '/../');
 $dotenv->load();
 
 $logger = new Logger('showtime');
+$streamHandler = new \Monolog\Handler\StreamHandler(__DIR__ . '/../storage/logs/laravel.log');
+$formatter = $streamHandler->getFormatter();
+$formatter->setDateFormat('Y-m-d H:i:s');
+$streamHandler->setFormatter($formatter);
+$logger->pushHandler($streamHandler);
 try {
-    $enabledAirbrake = env('AIRBRAKE_ENABLED', env('APP_ENV') !== 'local');
+    $enabledAirbrake = env('AIRBRAKE_ENABLED', false);
     if ($enabledAirbrake) {
         $airbrake = new \Airbrake\Notifier([
             'enabled' => true,
@@ -240,35 +338,62 @@ try {
         ]);
 
         $logHandler = new MonologHandler($airbrake, Logger::WARNING);
-        $logger->setHandlers([$logHandler]);
+        $logger->pushHandler($logHandler);
     }
 } catch (\Exception $e) {
     $logger->warning('unable to register airbrake notifier: ' . $e->getMessage());
 }
+try {
+    $sentryDSN = env('SENTRY_DSN');
+    if (!empty($sentryDSN)) {
+        $client = \Sentry\ClientBuilder::create([
+            'dsn' => $sentryDSN,
+            'environment' => env('APP_ENV', 'production'),
+            'send_default_pii' => true, // enabled to see same details as with laravel sentry
+        ])->getClient();
+        $handler = new \Sentry\Monolog\Handler(new \Sentry\State\Hub($client));
+        $logger->pushHandler($handler);
+    }
+} catch (\Exception $e) {
+    $logger->warning('unable to register sentry notifier: ' . $e->getMessage());
+}
 
+$showtimeResponse = new PlainPhpShowtimeResponse();
 $data = filter_input(INPUT_GET, 'data');
 $callback = filter_input(INPUT_GET, 'callback');
 
-// dependencies initialization
-$redis = new \Predis\Client([
-    'scheme' => 'tcp',
-    'host'   => getenv('REDIS_HOST'),
-    'port'   => getenv('REDIS_PORT') ?: 6379,
-    'password' => getenv('REDIS_PASSWORD') ?: null,
-    'database' => getenv('REDIS_DEFAULT_DATABASE') ?: 0,
-]);
-
-$showtimeResponse = new PlainPhpShowtimeResponse();
-
-/** @var \App\Contracts\SegmentAggregator $segmentAggregator */
-$segmentAggregator = unserialize($redis->get(\App\Providers\AppServiceProvider::SEGMENT_AGGREGATOR_REDIS_KEY))();
-if (!$segmentAggregator) {
-    $showtimeResponse->error($callback, 500, ['unable to get cached segment aggregator']);
+if ($data === null || $callback === null) {
+    $showtimeResponse->jsonResponse(['errors' => ['invalid request, data or callback params missing']]);
+    return;
 }
 
-$deviceDetector = new LazyDeviceDetector($redis);
-$maxmindDbPath = __DIR__ . DIRECTORY_SEPARATOR . '..' . DIRECTORY_SEPARATOR . getenv('MAXMIND_DATABASE');
-$geoReader = new LazyGeoReader($maxmindDbPath);
+header('Content-Type: application/javascript');
 
-$showtime = new Showtime($redis, $segmentAggregator, $geoReader, $deviceDetector, $logger);
-$showtime->showtime($data, $callback, $showtimeResponse);
+try {
+    // dependencies initialization
+    $redis = new \Predis\Client([
+        'scheme' => 'tcp',
+        'host'   => env('REDIS_HOST'),
+        'port'   => env('REDIS_PORT') ?: 6379,
+        'password' => env('REDIS_PASSWORD') ?: null,
+        'database' => env('REDIS_DEFAULT_DATABASE') ?: 0,
+    ], [
+        'prefix' => env('REDIS_PREFIX') ?: '',
+    ]);
+
+    $segmentAggregator = SegmentAggregator::unserializeFromRedis($redis);
+    if (!$segmentAggregator) {
+        $logger->error("unable to get cached segment aggregator, have you run 'campaigns:refresh-cache' command?");
+        $showtimeResponse->error($callback, 500, ['Internal error, application might not have been correctly initialized.']);
+    }
+
+    $deviceDetector = new LazyDeviceDetector($redis);
+    $maxmindDbPath = __DIR__ . DIRECTORY_SEPARATOR . '..' . DIRECTORY_SEPARATOR . env('MAXMIND_DATABASE');
+    $geoReader = new LazyGeoReader($maxmindDbPath);
+
+    $showtime = new Showtime($redis, $segmentAggregator, $geoReader, $deviceDetector, $logger);
+    $showtime->showtime($data, $callback, $showtimeResponse);
+} catch (\Exception $exception) {
+    $logger->error($exception);
+    $showtimeResponse->error($callback, 500, ['Internal error, unable to display campaigns.']);
+}

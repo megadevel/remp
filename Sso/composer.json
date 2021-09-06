@@ -1,7 +1,10 @@
 {
     "name": "remp/sso",
     "description": "REMP SSO",
-    "keywords": ["remp", "sso"],
+    "keywords": [
+        "remp",
+        "sso"
+    ],
     "license": "MIT",
     "type": "project",
     "minimum-stability": "dev",
@@ -30,41 +33,54 @@
         }
     ],
     "require": {
-        "php": "^7.3",
+        "php": "^7.4",
+        "ext-json": "*",
         "arrilot/laravel-widgets": "3.13.1",
         "deployer/deployer": "^6.8",
         "deployer/recipes": "^6.2",
-        "fideloper/proxy": "4.4.0",
+        "fideloper/proxy": "^4.4",
         "fzaninotto/faker": "~1.9",
-        "kouz/laravel-airbrake": "^0.4",
-        "laracasts/flash": "3.2",
-        "laravel/framework": "5.7.*",
-        "laravel/socialite": "4.4.1",
-        "laravelcollective/html": "5.7.*",
+        "kouz/laravel-airbrake": "^0.7",
+        "laracasts/flash": "^3.2",
+        "laravel/framework": "^8.42",
+        "laravel/socialite": "^5.2",
+        "laminas/laminas-diactoros": "^2.5",
+        "laravelcollective/html": "^6.2",
         "league/uri": "^5.3",
         "php-amqplib/php-amqplib": "^2.12",
-        "predis/predis": " ~1.1",
-        "recca0120/laravel-tracy": "~1.10.0",
+        "predis/predis": "^1.1",
         "remp/laravel-helpers": "*",
         "remp/laravel-sso": "*",
         "remp/laravel-widgets": "*",
+        "sentry/sentry-laravel": "^2.5",
+        "symfony/psr-http-message-bridge": "^1.0",
         "tymon/jwt-auth": "^1.0",
         "ukfast/laravel-health-check": "^1.5",
-        "yajra/laravel-datatables-oracle": "v8.13.7"
+        "yajra/laravel-datatables-oracle": "^9.18",
+        "laravel/tinker": "^2.5",
+        "fruitcake/laravel-cors": "^2.0",
+        "guzzlehttp/guzzle": "^7.0.1"
     },
     "require-dev": {
-        "barryvdh/laravel-ide-helper": "^2.8",
-        "friendsofphp/php-cs-fixer": "2.16.4",
-        "mockery/mockery": "^1.4",
-        "nunomaduro/collision": "^2.1.1",
-        "phpunit/phpunit": "9.3.11"
+        "barryvdh/laravel-ide-helper": "^2.10",
+        "friendsofphp/php-cs-fixer": "^3.0",
+        "mockery/mockery": "^1.4.2",
+        "nunomaduro/collision": "^5.0",
+        "phpunit/phpunit": "9.3.11",
+        "facade/ignition": "^2.5",
+        "fakerphp/faker": "^1.9.1",
+        "filp/whoops": "^2.12",
+        "beyondcode/laravel-dump-server": "^1.7",
+        "recca0120/laravel-tracy": "^1.13"
     },
     "autoload": {
         "classmap": [
             "database"
         ],
         "psr-4": {
-            "App\\": "app/"
+            "App\\": "app/",
+            "Database\\Factories\\": "database/factories/",
+            "Database\\Seeders\\": "database/seeders/"
         }
     },
     "autoload-dev": {

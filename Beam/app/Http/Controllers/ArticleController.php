@@ -5,16 +5,10 @@ namespace App\Http\Controllers;
 use App\Article;
 use App\Author;
 use App\Helpers\Journal\JournalHelpers;
-use App\Helpers\Misc;
 use App\Http\Requests\ArticleRequest;
-use App\Http\Requests\ArticleUpsertRequest;
-use App\Http\Requests\ArticleUpsertRequestV2;
-use App\Http\Requests\TopSearchRequest;
-use App\Http\Requests\UnreadArticlesRequest;
+use App\Http\Requests\ArticlesListRequest;
 use App\Http\Resources\ArticleResource;
 use App\Model\Config\ConversionRateConfig;
-use App\Model\NewsletterCriterion;
-use App\Model\Pageviews\TopSearch;
 use App\Model\Tag;
 use App\Section;
 use Html;
@@ -22,8 +16,6 @@ use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Http\Request;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\DB;
-use Illuminate\Support\Facades\Log;
-use Remp\Journal\AggregateRequest;
 use Remp\Journal\JournalContract;
 use Remp\Journal\TokenProvider;
 use Yajra\Datatables\Datatables;
@@ -52,14 +44,30 @@ class ArticleController extends Controller
      *
      * @return \Illuminate\Http\Response
      */
-    public function index()
+    public function index(ArticlesListRequest $request)
     {
+        $articles = null;
+
+        $externalIds = $request->input('external_ids', []);
+        if (count($externalIds)) {
+            $articles = Article::whereIn('external_id', $externalIds)->get();
+        }
+
+        if (!$articles) {
+            $ids = $request->input('ids', []);
+            if (count($request->ids)) {
+                $articles = Article::whereIn('id', $ids)->get();
+            }
+        }
+
+        if (!$articles) {
+            $articles = Article::paginate();
+        }
+
+        $articleResource = new ArticleResource($articles);
         return response()->format([
-            'html' => view('articles.pageviews', [
-                'authors' => Author::all()->pluck('name', 'id'),
-                'sections' => Section::all()->pluck('name', 'id'),
-            ]),
-            'json' => ArticleResource::collection(Article::paginate()),
+            'html' => redirect()->route('articles.pageviews'),
+            'json' => $articleResource,
         ]);
     }
 
@@ -68,6 +76,7 @@ class ArticleController extends Controller
         return response()->format([
             'html' => view('articles.conversions', [
                 'authors' => Author::all()->pluck('name', 'id'),
+                'contentTypes' => Article::groupBy('content_type')->pluck('content_type', 'content_type'),
                 'sections' => Section::all()->pluck('name', 'id'),
                 'tags' => Tag::all()->pluck('name', 'id'),
                 'publishedFrom' => $request->input('published_from', 'today - 30 days'),
@@ -85,6 +94,7 @@ class ArticleController extends Controller
                 "articles.id",
                 "articles.external_id",
                 "articles.title",
+                "articles.content_type",
                 "articles.url",
                 "articles.published_at",
                 "count(conversions.id) as conversions_count",
@@ -96,19 +106,19 @@ class ArticleController extends Controller
             ->groupBy(['articles.id', 'articles.title', 'articles.url', 'articles.published_at']);
 
         if ($request->input('published_from')) {
-            $publishedFrom = Carbon::parse($request->input('published_from'), $request->input('tz'))->tz('UTC');
+            $publishedFrom = Carbon::parse($request->input('published_from'), $request->input('tz'));
             $articlesQuery->where('published_at', '>=', $publishedFrom);
         }
         if ($request->input('published_to')) {
-            $publishedTo = Carbon::parse($request->input('published_to'), $request->input('tz'))->tz('UTC');
+            $publishedTo = Carbon::parse($request->input('published_to'), $request->input('tz'));
             $articlesQuery->where('published_at', '<=', $publishedTo);
         }
         if ($request->input('conversion_from')) {
-            $conversionFrom = Carbon::parse($request->input('conversion_from'), $request->input('tz'))->tz('UTC');
+            $conversionFrom = Carbon::parse($request->input('conversion_from'), $request->input('tz'));
             $articlesQuery->where('paid_at', '>=', $conversionFrom);
         }
         if ($request->input('conversion_to')) {
-            $conversionTo = Carbon::parse($request->input('conversion_to'), $request->input('tz'))->tz('UTC');
+            $conversionTo = Carbon::parse($request->input('conversion_to'), $request->input('tz'));
             $articlesQuery->where('paid_at', '<=', $conversionTo);
         }
         $token = $this->tokenProvider->getToken();
@@ -199,29 +209,33 @@ class ArticleController extends Controller
             ->filterColumn('title', function (Builder $query, $value) {
                 $query->where('articles.title', 'like', '%' . $value . '%');
             })
+            ->filterColumn('content_type', function (Builder $query, $value) {
+                $values = explode(',', $value);
+                $query->whereIn('articles.content_type', $values);
+            })
             ->filterColumn('authors', function (Builder $query, $value) {
                 $values = explode(",", $value);
                 $filterQuery = \DB::table('articles')
+                    ->select(['articles.id'])
                     ->join('article_author', 'articles.id', '=', 'article_author.article_id', 'left')
                     ->whereIn('article_author.author_id', $values);
-                $articleIds = $filterQuery->pluck('articles.id')->toArray();
-                $query->whereIn('articles.id', $articleIds);
+                $query->whereIn('articles.id', $filterQuery);
             })
             ->filterColumn('sections[, ].name', function (Builder $query, $value) {
                 $values = explode(",", $value);
                 $filterQuery = \DB::table('articles')
+                    ->select(['articles.id'])
                     ->join('article_section', 'articles.id', '=', 'article_section.article_id', 'left')
                     ->whereIn('article_section.section_id', $values);
-                $articleIds = $filterQuery->pluck('articles.id')->toArray();
-                $query->whereIn('articles.id', $articleIds);
+                $query->whereIn('articles.id', $filterQuery);
             })
             ->filterColumn('tags[, ].name', function (Builder $query, $value) {
                 $values = explode(",", $value);
                 $filterQuery = \DB::table('articles')
+                    ->select(['articles.id'])
                     ->join('article_tag', 'articles.id', '=', 'article_tag.article_id', 'left')
                     ->whereIn('article_tag.tag_id', $values);
-                $articleIds = $filterQuery->pluck('articles.id')->toArray();
-                $query->whereIn('articles.id', $articleIds);
+                $query->whereIn('articles.id', $filterQuery);
             })
             ->rawColumns(['authors'])
             ->make();
@@ -232,6 +246,7 @@ class ArticleController extends Controller
         return response()->format([
             'html' => view('articles.pageviews', [
                 'authors' => Author::all()->pluck('name', 'id'),
+                'contentTypes' => Article::groupBy('content_type')->pluck('content_type', 'content_type'),
                 'sections' => Section::all()->pluck('name', 'id'),
                 'tags' => Tag::all()->pluck('name', 'id'),
                 'publishedFrom' => $request->input('published_from', 'today - 30 days'),
@@ -248,10 +263,10 @@ class ArticleController extends Controller
             ->with(['authors', 'sections', 'tags']);
 
         if ($request->input('published_from')) {
-            $articles->where('published_at', '>=', Carbon::parse($request->input('published_from'), $request->input('tz'))->tz('UTC'));
+            $articles->where('published_at', '>=', Carbon::parse($request->input('published_from'), $request->input('tz')));
         }
         if ($request->input('published_to')) {
-            $articles->where('published_at', '<=', Carbon::parse($request->input('published_to'), $request->input('tz'))->tz('UTC'));
+            $articles->where('published_at', '<=', Carbon::parse($request->input('published_to'), $request->input('tz')));
         }
         $token = $this->tokenProvider->getToken();
         if ($token) {
@@ -289,29 +304,33 @@ class ArticleController extends Controller
             ->filterColumn('title', function (Builder $query, $value) {
                 $query->where('articles.title', 'like', '%' . $value . '%');
             })
+            ->filterColumn('content_type', function (Builder $query, $value) {
+                $values = explode(',', $value);
+                $query->whereIn('articles.content_type', $values);
+            })
             ->filterColumn('authors', function (Builder $query, $value) {
                 $values = explode(',', $value);
                 $filterQuery = \DB::table('articles')
+                    ->select(['articles.id'])
                     ->join('article_author', 'articles.id', '=', 'article_author.article_id', 'left')
                     ->whereIn('article_author.author_id', $values);
-                $articleIds = $filterQuery->pluck('articles.id')->toArray();
-                $query->whereIn('articles.id', $articleIds);
+                $query->whereIn('articles.id', $filterQuery);
             })
             ->filterColumn('sections[, ].name', function (Builder $query, $value) {
                 $values = explode(',', $value);
                 $filterQuery = \DB::table('articles')
+                    ->select(['articles.id'])
                     ->join('article_section', 'articles.id', '=', 'article_section.article_id', 'left')
                     ->whereIn('article_section.section_id', $values);
-                $articleIds = $filterQuery->pluck('articles.id')->toArray();
-                $query->whereIn('articles.id', $articleIds);
+                $query->whereIn('articles.id', $filterQuery);
             })
             ->filterColumn('tags[, ].name', function (Builder $query, $value) {
                 $values = explode(',', $value);
                 $filterQuery = \DB::table('articles')
+                    ->select(['articles.id'])
                     ->join('article_tag', 'articles.id', '=', 'article_tag.article_id', 'left')
                     ->whereIn('article_tag.tag_id', $values);
-                $articleIds = $filterQuery->pluck('articles.id')->toArray();
-                $query->whereIn('articles.id', $articleIds);
+                $query->whereIn('articles.id', $filterQuery);
             })
             ->orderColumn('avg_sum_all', 'timespent_all / pageviews_all $1')
             ->orderColumn('avg_sum_signed_in', 'timespent_signed_in / pageviews_signed_in $1')
@@ -365,349 +384,5 @@ class ArticleController extends Controller
             'html' => redirect(route('articles.pageviews'))->with('success', 'Article created'),
             'json' => new ArticleResource($article),
         ]);
-    }
-
-    public function upsert(ArticleUpsertRequest $request)
-    {
-        Log::info('Upserting articles', ['params' => $request->json()->all()]);
-
-        $articles = [];
-        foreach ($request->get('articles', []) as $a) {
-            // When saving to DB, Eloquent strips timezone information,
-            // therefore convert to UTC
-            $a['published_at'] = Carbon::parse($a['published_at'])->tz('UTC');
-            $a['content_type'] = $a['content_type'] ?? Article::DEFAULT_CONTENT_TYPE;
-            $article = Article::upsert($a);
-
-            $article->sections()->detach();
-            foreach ($a['sections'] ?? [] as $sectionName) {
-                $section = Section::firstOrCreate([
-                    'name' => $sectionName,
-                ]);
-                $article->sections()->attach($section);
-            }
-
-            $article->tags()->detach();
-            foreach ($a['tags'] ?? [] as $tagName) {
-                $tag = Tag::firstOrCreate([
-                    'name' => $tagName,
-                ]);
-                $article->tags()->attach($tag);
-            }
-
-            $article->authors()->detach();
-            foreach ($a['authors'] as $authorName) {
-                $section = Author::firstOrCreate([
-                    'name' => $authorName,
-                ]);
-                $article->authors()->attach($section);
-            }
-
-            // Load existing titles
-            $existingArticleTitles = $article->articleTitles()
-                ->orderBy('updated_at')
-                ->get()
-                ->groupBy('variant');
-
-            $lastTitles = [];
-            foreach ($existingArticleTitles as $variant => $variantTitles) {
-                $lastTitles[$variant] = $variantTitles->last()->title;
-            }
-
-            // Saving titles
-            $newTitles = $a['titles'] ?? [];
-
-            $newTitleVariants = array_keys($newTitles);
-            $lastTitleVariants = array_keys($lastTitles);
-
-            // Titles that were not present in new titles, but were previously recorded
-            foreach (array_diff($lastTitleVariants, $newTitleVariants) as $variant) {
-                $lastTitle = $lastTitles[$variant];
-                if ($lastTitle !== null) {
-                    // title was deleted and it was not recorded yet
-                    $article->articleTitles()->create([
-                        'variant' => $variant,
-                        'title' => null // deleted flag
-                    ]);
-                }
-            }
-
-            // New titles, not previously recorded
-            foreach (array_diff($newTitleVariants, $lastTitleVariants) as $variant) {
-                $newTitle = html_entity_decode($newTitles[$variant], ENT_QUOTES);
-                $article->articleTitles()->create([
-                    'variant' => $variant,
-                    'title' => $newTitle
-                ]);
-            }
-
-            // Changed titles
-            foreach (array_intersect($newTitleVariants, $lastTitleVariants) as $variant) {
-                $lastTitle = $lastTitles[$variant];
-                $newTitle = html_entity_decode($newTitles[$variant], ENT_QUOTES);
-
-                if ($lastTitle !== $newTitle) {
-                    $article->articleTitles()->create([
-                        'variant' => $variant,
-                        'title' => $newTitle
-                    ]);
-                }
-            }
-
-            $article->load(['authors', 'sections', 'tags']);
-            $articles[] = $article;
-        }
-
-        return response()->format([
-            'html' => redirect(route('articles.pageviews'))->with('success', 'Article created'),
-            'json' => ArticleResource::collection(collect($articles)),
-        ]);
-    }
-
-    public function upsertV2(ArticleUpsertRequestV2 $request)
-    {
-        $articles = [];
-        foreach ($request->get('articles', []) as $a) {
-            // When saving to DB, Eloquent strips timezone information,
-            // therefore convert to UTC
-            $a['published_at'] = Carbon::parse($a['published_at'])->tz('UTC');
-            $a['content_type'] = $a['content_type'] ?? Article::DEFAULT_CONTENT_TYPE;
-            $article = Article::upsert($a);
-
-            $article->sections()->detach();
-            foreach ($a['sections'] ?? [] as $section) {
-                $sectionObj = Section::where('external_id', $section['external_id'])->first();
-                if ($sectionObj) {
-                    $sectionObj->update($section);
-                    $article->sections()->attach($sectionObj);
-                    continue;
-                }
-
-                $sectionObj = Section::where('name', $section['name'])->first();
-                if ($sectionObj && $sectionObj->external_id === null) {
-                    $sectionObj->update($section);
-                    $article->sections()->attach($sectionObj);
-                    continue;
-                }
-
-                $sectionObj = Section::firstOrCreate($section);
-                $article->sections()->attach($sectionObj);
-            }
-
-            $article->tags()->detach();
-            foreach ($a['tags'] ?? [] as $tag) {
-                $tagObj = Tag::where('external_id', $tag['external_id'])->first();
-                if ($tagObj) {
-                    $tagObj->update($tag);
-                    $article->tags()->attach($tagObj);
-                    continue;
-                }
-
-                $tagObj = Tag::where('name', $tag['name'])->first();
-                if ($tagObj && $tagObj->external_id === null) {
-                    $tagObj->update($tag);
-                    $article->tags()->attach($tagObj);
-                    continue;
-                }
-
-                $tagObj = Tag::firstOrCreate($tag);
-                $article->tags()->attach($tagObj);
-            }
-
-            $article->authors()->detach();
-            foreach ($a['authors'] ?? [] as $author) {
-                $authorObj = Author::where('external_id', $author['external_id'])->first();
-                if ($authorObj) {
-                    $authorObj->update($author);
-                    $article->authors()->attach($authorObj);
-                    continue;
-                }
-
-                $authorObj = Author::where('name', $author['name'])->first();
-                if ($authorObj && $authorObj->external_id === null) {
-                    $authorObj->update($author);
-                    $article->authors()->attach($authorObj);
-                    continue;
-                }
-
-                $authorObj = Author::firstOrCreate($author);
-                $article->authors()->attach($authorObj);
-            }
-
-            if (isset($a['titles']) && is_array($a['titles'])) {
-                // Load existing titles
-                $existingArticleTitles = $article->articleTitles()
-                    ->orderBy('updated_at')
-                    ->get()
-                    ->groupBy('variant');
-
-                $lastTitles = [];
-                foreach ($existingArticleTitles as $variant => $variantTitles) {
-                    $lastTitles[$variant] = $variantTitles->last()->title;
-                }
-
-                // Saving titles
-                $newTitles = $a['titles'];
-
-                $newTitleVariants = array_keys($newTitles);
-                $lastTitleVariants = array_keys($lastTitles);
-
-                // Titles that were not present in new titles, but were previously recorded
-                foreach (array_diff($lastTitleVariants, $newTitleVariants) as $variant) {
-                    $lastTitle = $lastTitles[$variant];
-                    if ($lastTitle !== null) {
-                        // title was deleted and it was not recorded yet
-                        $article->articleTitles()->create([
-                            'variant' => $variant,
-                            'title' => null // deleted flag
-                        ]);
-                    }
-                }
-
-                // New titles, not previously recorded
-                foreach (array_diff($newTitleVariants, $lastTitleVariants) as $variant) {
-                    $newTitle = html_entity_decode($newTitles[$variant], ENT_QUOTES);
-                    $article->articleTitles()->create([
-                        'variant' => $variant,
-                        'title' => $newTitle
-                    ]);
-                }
-
-                // Changed titles
-                foreach (array_intersect($newTitleVariants, $lastTitleVariants) as $variant) {
-                    $lastTitle = $lastTitles[$variant];
-                    $newTitle = html_entity_decode($newTitles[$variant], ENT_QUOTES);
-
-                    if ($lastTitle !== $newTitle) {
-                        $article->articleTitles()->create([
-                            'variant' => $variant,
-                            'title' => $newTitle
-                        ]);
-                    }
-                }
-            }
-
-            $article->load(['authors', 'sections', 'tags']);
-            $articles[] = $article;
-        }
-
-        return response()->format([
-            'html' => redirect(route('articles.pageviews'))->with('success', 'Article created'),
-            'json' => ArticleResource::collection(collect($articles)),
-        ]);
-    }
-
-    public function unreadArticlesForUsers(UnreadArticlesRequest $request)
-    {
-        // Request with timespan 30 days typically takes about 50 seconds,
-        // therefore add some safe margin to request execution time
-        set_time_limit(120);
-
-        $articlesCount = $request->input('articles_count');
-        $timespan = $request->input('timespan');
-        $readArticlesTimespan = $request->input('read_articles_timespan');
-
-        $ignoreAuthors = $request->input('ignore_authors', []);
-
-        $topArticlesPerCriterion = [];
-
-        /** @var NewsletterCriterion[] $criteria */
-        $criteria = [];
-        foreach ($request->input('criteria') as $criteriaString) {
-            $criteria[] = NewsletterCriterion::get($criteriaString);
-            $topArticlesPerCriterion[] = null;
-        }
-        $topArticlesPerUser = [];
-
-        $timeAfter = Misc::timespanInPast($timespan);
-        // If no read_articles_timespan is specified, check for week old read articles (past given timespan)
-        $readArticlesAfter = $readArticlesTimespan ? Misc::timespanInPast($readArticlesTimespan) : (clone $timeAfter)->subWeek();
-        $timeBefore = Carbon::now();
-
-        foreach (array_chunk($request->user_ids, 100) as $userIdsChunk) {
-            $usersReadArticles = $this->readArticlesForUsers($readArticlesAfter, $timeBefore, $userIdsChunk);
-
-            // Save top articles per user
-            foreach ($userIdsChunk as $userId) {
-                $topArticlesUrls = [];
-                $topArticlesUrlsOrdered = [];
-
-                $i = 0;
-                $criterionIndex = 0;
-                while (count($topArticlesUrls) < $articlesCount) {
-                    if (!$topArticlesPerCriterion[$criterionIndex]) {
-                        $criterion = $criteria[$criterionIndex];
-                        $topArticlesPerCriterion[$criterionIndex] = $criterion->getCachedArticles($timespan, $ignoreAuthors);
-                    }
-
-                    if ($i >= count($topArticlesPerCriterion[$criterionIndex])) {
-                        if ($criterionIndex === count($criteria) - 1) {
-                            break;
-                        }
-                        $criterionIndex++;
-                        $i = 0;
-                        continue;
-                    }
-
-                    $topArticle = $topArticlesPerCriterion[$criterionIndex][$i];
-                    if ((!array_key_exists($userId, $usersReadArticles) || !array_key_exists($topArticle->external_id, $usersReadArticles[$userId]))
-                        && !array_key_exists($topArticle->url, $topArticlesUrls)) {
-                        $topArticlesUrls[$topArticle->url] = true;
-                        $topArticlesUrlsOrdered[] = $topArticle->url;
-                    }
-
-                    $i++;
-                }
-
-                $topArticlesPerUser[$userId] = $topArticlesUrlsOrdered;
-            }
-        }
-
-        return response()->json([
-            'status' => 'ok',
-            'data' => $topArticlesPerUser
-        ]);
-    }
-
-    private function readArticlesForUsers(Carbon $timeAfter, Carbon $timeBefore, array $userIds): array
-    {
-        $usersReadArticles = [];
-        $r = new AggregateRequest('pageviews', 'load');
-        $r->setTimeAfter($timeAfter);
-        $r->setTimeBefore($timeBefore);
-        $r->addGroup('user_id', 'article_id');
-        $r->addFilter('user_id', ...$userIds);
-
-        $result = collect($this->journal->count($r));
-        foreach ($result as $item) {
-            if ($item->tags->article_id !== '') {
-                $userId = $item->tags->user_id;
-                if (!array_key_exists($userId, $usersReadArticles)) {
-                    $usersReadArticles[$userId] = [];
-                }
-                $usersReadArticles[$userId][$item->tags->article_id] = true;
-            }
-        }
-        return $usersReadArticles;
-    }
-
-    public function topArticles(TopSearchRequest $request, TopSearch $topSearch)
-    {
-        $limit = $request->json('limit');
-        $timeFrom = Carbon::parse($request->json('from'));
-
-        $sections = $request->json('sections');
-        $sectionValueType = null;
-        $sectionValues = null;
-        if (isset($sections['external_id'])) {
-            $sectionValueType = 'external_id';
-            $sectionValues = $sections['external_id'];
-        } elseif (isset($sections['name'])) {
-            $sectionValueType = 'name';
-            $sectionValues = $sections['name'];
-        }
-        $contentType = $request->json('content_type');
-
-        return response()->json($topSearch->topArticles($timeFrom, $limit, $sectionValueType, $sectionValues, $contentType));
     }
 }

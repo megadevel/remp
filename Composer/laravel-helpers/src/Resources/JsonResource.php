@@ -2,10 +2,10 @@
 
 namespace Remp\LaravelHelpers\Resources;
 
-use Illuminate\Http\Resources\Json\Resource;
+use Illuminate\Http\Resources\Json\JsonResource as LaravelJsonResource;
 use Symfony\Component\HttpKernel\Exception\HttpException;
 
-class JsonResource extends Resource
+class JsonResource extends LaravelJsonResource
 {
     public function toArray($request)
     {
@@ -31,11 +31,5 @@ class JsonResource extends Resource
                 $response->setStatusCode(500);
             }
         }
-    }
-
-    // Fix for https://github.com/laravel/framework/issues/29916, (currently on Laravel 5.7)
-    // TODO: upgrade laravel to newest version and remove implementation of this function
-    public function offsetExists($offset){
-        return is_array($this->resource) ? isset($this->resource[$offset]) : property_exists($this->resource, $offset);
     }
 }

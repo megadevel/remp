@@ -10,7 +10,7 @@ use App\Model\ConversionCommerceEventProduct;
 use App\Model\ConversionGeneralEvent;
 use App\Model\ConversionPageviewEvent;
 use Carbon\Carbon;
-use Illuminate\Console\Command;
+use App\Console\Command;
 use Illuminate\Support\Collection;
 use Remp\Journal\AggregateRequest;
 use Remp\Journal\JournalContract;
@@ -40,7 +40,6 @@ class AggregateConversionEvents extends Command
 
     public function handle()
     {
-        ini_set('memory_limit', '1G');
         $this->line('Aggregation of conversion events started');
         $conversionId = $this->option('conversion_id') ?? null;
 
@@ -50,12 +49,12 @@ class AggregateConversionEvents extends Command
             $conversion = Conversion::find($conversionId);
             if (!$conversion) {
                 $this->error("Conversion with ID $conversionId not found.");
-                return;
+                return 1;
             }
 
             if ($conversion->events_aggregated) {
                 $this->info("Conversion with ID $conversionId already aggregated.");
-                return;
+                return 2;
             }
 
             $this->aggregateConversion($conversion, $days);
@@ -66,13 +65,14 @@ class AggregateConversionEvents extends Command
         }
 
         $this->line(' <info>Done!</info>');
+        return 0;
     }
 
-    protected function getBrowsersForUser(Conversion $conversion, $category, $action = null)
+    protected function getBrowsersForUser(Conversion $conversion, $days, $category, $action = null)
     {
         $before = $conversion->paid_at;
         // take maximum one year old browser IDs
-        $after = (clone $before)->subYear();
+        $after = (clone $before)->subDays($days);
 
         $browserIds = [];
         $records = $this->journal->count(AggregateRequest::from($category, $action)
@@ -94,7 +94,9 @@ class AggregateConversionEvents extends Command
 
     private function getUnaggregatedConversions(): Collection
     {
-        return Conversion::where('events_aggregated', 0)->get();
+        return Conversion::where('events_aggregated', 0)
+            ->orderBy('paid_at', 'DESC')
+            ->get();
     }
 
     protected function aggregateConversion(Conversion $conversion, int $days)
@@ -109,18 +111,18 @@ class AggregateConversionEvents extends Command
         try {
             $pageviewEvents = $this->loadPageviewEvents(
                 $conversion,
-                $this->getBrowsersForUser($conversion, 'pageviews', 'load'),
+                $this->getBrowsersForUser($conversion, $days, 'pageviews', 'load'),
                 $days
             );
 
             $commerceEvents = $this->loadCommerceEvents(
                 $conversion,
-                $this->getBrowsersForUser($conversion, 'commerce'),
+                $this->getBrowsersForUser($conversion, $days, 'commerce'),
                 $days
             );
             $generalEvents = $this->loadGeneralEvents(
                 $conversion,
-                $this->getBrowsersForUser($conversion, 'events'),
+                $this->getBrowsersForUser($conversion, $days, 'events'),
                 $days
             );
 
@@ -211,7 +213,7 @@ class AggregateConversionEvents extends Command
                 $article = Article::where('external_id', $item->article->id)->first();
 
                 if ($article) {
-                    $time = Carbon::parse($item->system->time)->tz('UTC');
+                    $time = Carbon::parse($item->system->time);
                     $timeToConversion = $conversion->paid_at->diffInMinutes($time);
 
                     $toSave[] = [
@@ -222,10 +224,11 @@ class AggregateConversionEvents extends Command
                         'locked' => isset($item->article->locked) ? filter_var($item->article->locked, FILTER_VALIDATE_BOOLEAN) : null,
                         'signed_in' => isset($item->user->id),
                         'timespent' => $item->user->timespent ?? null,
-                        'utm_campaign' => $item->user->source->utm_campaign ?? null,
-                        'utm_content' => $item->user->source->utm_content ?? null,
-                        'utm_medium' => $item->user->source->utm_medium ?? null,
-                        'utm_source' => $item->user->source->utm_source ?? null,
+                        // Background compatibility with utm_ -- will be removed
+                        'rtm_campaign' => $item->user->source->rtm_campaign ?? $item->user->source->utm_campaign ?? null,
+                        'rtm_content' => $item->user->source->rtm_content ?? $item->user->source->utm_content ?? null,
+                        'rtm_medium' => $item->user->source->rtm_medium ?? $item->user->source->utm_medium ?? null,
+                        'rtm_source' => $item->user->source->rtm_source ?? $item->user->source->utm_source ?? null,
                     ];
                 }
             }
@@ -253,7 +256,7 @@ class AggregateConversionEvents extends Command
 
                     $processedIds[$item->id] = true;
 
-                    $time = Carbon::parse($item->system->time)->tz('UTC');
+                    $time = Carbon::parse($item->system->time);
                     $timeToConversion = $conversion->paid_at->diffInMinutes($time);
 
                     $step = $item->step;
@@ -265,10 +268,11 @@ class AggregateConversionEvents extends Command
                         'funnel_id' => $item->$step->funnel_id ?? null,
                         'amount' => $item->$step->revenue->amount ?? null,
                         'currency' => $item->$step->revenue->currency ?? null,
-                        'utm_campaign' => $item->source->utm_campaign ?? null,
-                        'utm_content' => $item->source->utm_content ?? null,
-                        'utm_medium' => $item->source->utm_medium ?? null,
-                        'utm_source' => $item->source->utm_source ?? null,
+                        // background compatibility with utm -- will be removed
+                        'rtm_campaign' => $item->source->rtm_campaign ?? $item->source->utm_campaign ?? null,
+                        'rtm_content' => $item->source->rtm_content ?? $item->source->utm_content ?? null,
+                        'rtm_medium' => $item->source->rtm_medium ?? $item->source->utm_medium ?? null,
+                        'rtm_source' => $item->source->rtm_source ?? $item->source->utm_source ?? null,
                         'conversion_id' => $conversion->id,
                         self::TEMP_PRODUCT_IDS_LABEL => $item->$step->product_ids ?? [] // this will be removed later
                     ];
@@ -308,7 +312,7 @@ class AggregateConversionEvents extends Command
 
                     $processedIds[$item->id] = true;
 
-                    $time = Carbon::parse($item->system->time)->tz('UTC');
+                    $time = Carbon::parse($item->system->time);
                     $timeToConversion = $conversion->paid_at->diffInMinutes($time);
 
                     $toSave[] = [
@@ -317,10 +321,11 @@ class AggregateConversionEvents extends Command
                         'action' => $item->action ?? null,
                         'category' => $item->category ?? null,
                         'conversion_id' => $conversion->id,
-                        'utm_campaign' => $item->utm_campaign ?? null,
-                        'utm_content' => $item->utm_content ?? null,
-                        'utm_medium' => $item->utm_medium ?? null,
-                        'utm_source' => $item->utm_source ?? null,
+                        // Background compatibility with utm_ -- will be removed
+                        'rtm_campaign' => $item->rtm_campaign ?? $item->utm_campaign ?? null,
+                        'rtm_content' => $item->rtm_content ?? $item->utm_content ?? null,
+                        'rtm_medium' => $item->rtm_medium ?? $item->utm_medium ?? null,
+                        'rtm_source' => $item->rtm_source ?? $item->utm_source ?? null,
                     ];
                 }
             }

@@ -6,7 +6,7 @@ use App\Helpers\Journal\JournalInterval;
 use App\Model\ArticleViewsSnapshot;
 use App\Model\Snapshots\SnapshotHelpers;
 use Carbon\Carbon;
-use Illuminate\Console\Command;
+use App\Console\Command;
 
 class CompressSnapshots extends Command
 {
@@ -31,7 +31,8 @@ class CompressSnapshots extends Command
         $this->line('');
 
         // Start compression from last hour (to avoid complicated rounding of retention intervals, to get "nice" datetimes in dashboard)
-        $now = Carbon::now()->second(0)->minute(0);
+        $now = Carbon::now();
+        $now->setTime($now->hour, 0);
 
         // $now can be optionally rewritten (useful in tests)
         $now = $this->option('now') ? Carbon::parse($this->option('now')) : $now;
@@ -39,6 +40,7 @@ class CompressSnapshots extends Command
         $this->compress($now);
 
         $this->line(' <info>OK!</info>');
+        return 0;
     }
 
     private function compress(Carbon $now)
@@ -61,7 +63,7 @@ class CompressSnapshots extends Command
 
                 $excludedTimePoints = array_map(function (string $zuluTimeString) {
                     return Carbon::parse($zuluTimeString);
-                }, $timePoints->toExclude);
+                }, $timePoints->getExcludedPoints());
 
                 foreach (array_chunk($excludedTimePoints, 200) as $excludedTimePointsChunk) {
                     $deletedCount = ArticleViewsSnapshot::deleteForTimes($excludedTimePointsChunk);

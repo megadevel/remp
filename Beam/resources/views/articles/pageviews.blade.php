@@ -39,6 +39,7 @@
                     'render' => 'number',
                     'searchable' => false,
                     'priority' => 2,
+                    'orderSequence' => ['desc', 'asc'],
                     'className' => 'text-right',
                 ],
                 'pageviews_signed_in' => [
@@ -46,6 +47,7 @@
                     'render' => 'number',
                     'searchable' => false,
                     'priority' => 5,
+                    'orderSequence' => ['desc', 'asc'],
                     'className' => 'text-right',
                 ],
                 'pageviews_subscribers' => [
@@ -53,6 +55,7 @@
                     'render' => 'number',
                     'searchable' => false,
                     'priority' => 5,
+                    'orderSequence' => ['desc', 'asc'],
                     'className' => 'text-right',
                 ],
                 'pageviews_subscribers_ratio' => [
@@ -60,6 +63,7 @@
                     'render' => 'percentage',
                     'searchable' => false,
                     'priority' => 5,
+                    'orderSequence' => ['desc', 'asc'],
                     'className' => 'text-right',
                 ],
                 'avg_sum_all' => [
@@ -67,6 +71,7 @@
                     'render' => 'duration',
                     'searchable' => false,
                     'priority' => 2,
+                    'orderSequence' => ['desc', 'asc'],
                     'className' => 'text-right',
                 ],
                 'avg_sum_signed_in' => [
@@ -74,6 +79,7 @@
                     'render' => 'duration',
                     'searchable' => false,
                     'priority' => 5,
+                    'orderSequence' => ['desc', 'asc'],
                     'className' => 'text-right',
                 ],
                 'avg_sum_subscribers' => [
@@ -81,7 +87,15 @@
                     'render' => 'duration',
                     'searchable' => false,
                     'priority' => 5,
+                    'orderSequence' => ['desc', 'asc'],
                     'className' => 'text-right',
+                ],
+                'content_type' => [
+                    'header' => 'Type',
+                    'orderable' => false,
+                    'filter' => $contentTypes,
+                    'priority' => 2,
+                    'visible' => count($contentTypes) > 1,
                 ],
                 'authors' => [
                     'header' => 'authors',

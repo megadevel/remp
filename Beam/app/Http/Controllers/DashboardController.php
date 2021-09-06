@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers;
 
+use Illuminate\Support\Arr;
 use App\Article;
 use App\Helpers\Journal\JournalHelpers;
 use App\Helpers\Colors;
@@ -23,7 +24,6 @@ use Remp\Journal\AggregateRequest;
 use Remp\Journal\ConcurrentsRequest;
 use Remp\Journal\JournalContract;
 use Remp\Journal\JournalException;
-use Remp\Journal\ListRequest;
 
 class DashboardController extends Controller
 {
@@ -131,10 +131,10 @@ class DashboardController extends Controller
         $interval = $request->get('interval');
         $journalInterval = new JournalInterval($tz, $interval, null, ['today', '7days', '30days']);
 
-        $from = $journalInterval->timeAfter->tz('UTC');
-        $to = $journalInterval->timeBefore->tz('UTC');
+        $from = $journalInterval->timeAfter;
+        $to = $journalInterval->timeBefore;
 
-        $toNextDayStart = (clone $to)->tz($tz)->addDay()->startOfDay()->tz('UTC');
+        $toNextDayStart = (clone $to)->tz($tz)->addDay()->startOfDay();
         $intervalMinutes = $journalInterval->intervalMinutes;
 
         $currentData = $this->snapshotHelpers->concurrentsHistogram($journalInterval, null, true);
@@ -154,7 +154,7 @@ class DashboardController extends Controller
                 $shadowTo = $toNextDayStart->copy()->subWeeks($i);
 
                 // If there was a time shift, remember time needs to be adjusted by the timezone difference
-                $diff = $shadowFrom->tz('utc')->diff($from->tz('utc'));
+                $diff = $shadowFrom->diff($from);
                 $hourDifference = $diff->invert === 0 ? $diff->h : - $diff->h;
 
                 $shadowInterval = clone $journalInterval;
@@ -198,10 +198,10 @@ class DashboardController extends Controller
         // Get tags
         $tags = array_keys($tags);
         $emptyValues = [];
-        $totalCounts = [];
+        $totalTagCounts = [];
         foreach ($tags as $tag) {
             $emptyValues[$tag] = 0;
-            $totalCounts[$tag] = 0;
+            $totalTagCounts[$tag] = 0;
         }
 
         $results = [];
@@ -216,7 +216,7 @@ class DashboardController extends Controller
             }
             $tag = $this->itemTag($item);
             $results[$zuluTime][$tag] += $item->count;
-            $totalCounts[$tag] += $item->count;
+            $totalTagCounts[$tag] += $item->count;
         }
 
         // Save shadow results
@@ -238,15 +238,7 @@ class DashboardController extends Controller
             }
         }
 
-        // Reorder tags by total counts
-        arsort($totalCounts);
-        $i = 0;
-        $tagOrdering = [];
-        foreach ($totalCounts as $tag => $count) {
-            $tagOrdering[$tag] = $i;
-            $i++;
-        }
-        $orderedTags = array_keys($tagOrdering);
+        $orderedTags = Colors::orderRefererMediumTags($totalTagCounts);
 
         $jsonResponse = [
             'results' => array_values($results),
@@ -254,7 +246,7 @@ class DashboardController extends Controller
             'previousResultsSummed' => array_values($shadowResultsSummed),
             'intervalMinutes' => $intervalMinutes,
             'tags' => $orderedTags,
-            'colors' => Colors::refererMediumTagsToColors($orderedTags),
+            'colors' => array_values(Colors::assignColorsToMediumRefers($orderedTags)),
             'events' => $this->loadExternalEvents($journalInterval, $request->get('externalEvents', []))
         ];
 
@@ -289,19 +281,22 @@ class DashboardController extends Controller
         $interval = $request->get('interval');
         [$timeBefore, $timeAfter, $intervalText, $intervalMinutes] = $this->getJournalParameters($interval, $tz);
 
-        $endOfDay = (clone $timeAfter)->tz($tz)->endOfDay()->tz('UTC');
+        $endOfDay = (clone $timeAfter)->tz($tz)->endOfDay();
 
         $journalRequest = new AggregateRequest('pageviews', 'load');
         $journalRequest->setTimeAfter($timeAfter);
         $journalRequest->setTimeBefore($timeBefore);
-        $journalRequest->setTimeHistogram($intervalText, '0h');
+        $journalRequest->setTimeHistogram($intervalText);
         $journalRequest->addGroup('derived_referer_medium');
         $currentRecords = collect($this->journal->count($journalRequest));
 
         // Get all tags
         $tags = [];
+        $totalCounts = [];
         foreach ($currentRecords as $record) {
-            $tags[$this->getRefererMediumFromJournalRecord($record)] = true;
+            $tag = $this->getRefererMediumFromJournalRecord($record);
+            $totalCounts[$tag] = 0;
+            $tags[$tag] = true;
         }
 
         // Compute shadow values for today and 7-days intervals
@@ -314,7 +309,7 @@ class DashboardController extends Controller
                 $to = (clone $timeBefore)->subWeeks($i);
 
                 // If there was a time shift, remember time needs to be adjusted by the timezone difference
-                $diff = $from->tz('utc')->diff($timeAfter->tz('utc'));
+                $diff = $from->diff($timeAfter);
                 $hourDifference = $diff->invert === 0 ? $diff->h : - $diff->h;
 
                 foreach ($this->pageviewRecordsBasedOnRefererMedium($from, $to, $intervalText) as $record) {
@@ -383,6 +378,7 @@ class DashboardController extends Controller
             foreach ($record->time_histogram as $timeValue) {
                 $results[$timeValue->time][$currentTag] = $timeValue->value;
             }
+            $totalCounts[$currentTag] += $record->count;
         }
 
         // Save shadow results
@@ -413,7 +409,7 @@ class DashboardController extends Controller
             $current = Carbon::now();
 
             // if recent interval is bigger than 120 seconds, recompute its values and add it back to results
-            // smaller intervals do not create good approximation
+            // smaller intervals do not make good approximations
             if ((clone $current)->subSeconds(120)->gt($unfinishedDate)) {
                 $increaseRate = ($intervalMinutes * 60) / ($current->getTimestamp() - $unfinishedDate->getTimestamp());
                 foreach ($tags as $tag) {
@@ -430,13 +426,15 @@ class DashboardController extends Controller
 
         $events = $this->loadExternalEvents(new JournalInterval($tz, $interval, null, ['today', '7days', '30days']), $request->get('externalEvents', []));
 
+        $orderedTags = Colors::orderRefererMediumTags($totalCounts);
+
         $jsonResponse = [
             'intervalMinutes' => $intervalMinutes,
             'results' => $results,
             'previousResults' => array_values($shadowResults),
             'previousResultsSummed' => array_values($shadowResultsSummed),
-            'tags' => $tags,
-            'colors' => Colors::refererMediumTagsToColors($tags),
+            'tags' => $orderedTags,
+            'colors' => array_values(Colors::assignColorsToMediumRefers($orderedTags)),
             'events' => $events,
         ];
 
@@ -455,7 +453,7 @@ class DashboardController extends Controller
         $journalRequest = new AggregateRequest('pageviews', 'load');
         $journalRequest->setTimeAfter($timeAfter);
         $journalRequest->setTimeBefore($timeBefore);
-        $journalRequest->setTimeHistogram($interval, '0h');
+        $journalRequest->setTimeHistogram($interval);
         $journalRequest->addGroup('derived_referer_medium');
 
         return collect($this->journal->count($journalRequest));
@@ -499,7 +497,7 @@ class DashboardController extends Controller
             ];
         }
 
-        $colors = Colors::generalTagsToColors(array_keys($tags), true);
+        $colors = Colors::assignColorsToGeneralTags(array_keys($tags));
         foreach ($events as $event) {
             $event->color = $colors[$event->id];
         }
@@ -534,6 +532,18 @@ class DashboardController extends Controller
         $topPages = [];
         $i = 0;
         $totalConcurrents = 0;
+        $tz = new \DateTimeZone('UTC');
+        $journalInterval = new JournalInterval($tz, '1day');
+
+        $articleQuery = Article::whereIn(
+            'external_id',
+            array_filter($records->pluck('tags.article_id')->toArray())
+        );
+
+        $articles = [];
+        foreach ($articleQuery->get() as $article) {
+            $articles[$article->external_id] = $article;
+        }
         foreach ($records as $record) {
             $totalConcurrents += $record->count;
 
@@ -549,7 +559,7 @@ class DashboardController extends Controller
                 $obj->title = 'Landing page';
                 $obj->landing_page = true;
             } else {
-                $article = Article::where('external_id', $record->tags->article_id)->first();
+                $article = $articles[$record->tags->article_id] ?? null;
                 if (!$article) {
                     continue;
                 }
@@ -557,12 +567,15 @@ class DashboardController extends Controller
                 $obj->landing_page = false;
                 $obj->title = $article->title;
                 $obj->published_at = $article->published_at->toAtomString();
-                $obj->conversions_count = $article->conversions->count();
+                $obj->conversions_count = (clone $article)->conversions->count();
                 $obj->article = $article;
             }
             $topPages[] = $obj;
             $i++;
         }
+
+        // Add chart data into top articles
+        $topPages = $this->addOverviewChartData($topPages, $journalInterval);
 
         // Top articles without landing page(s)
         $topArticles = collect($topPages)->filter(function ($item) {
@@ -580,7 +593,6 @@ class DashboardController extends Controller
         $externalIdsToAbTestFlags = $this->journalHelper->abTestFlagsForArticles($topArticles, Carbon::now()->subMinutes(5));
 
         $threeMonthsAgo = Carbon::now()->subMonths(3);
-
         foreach ($topPages as $item) {
             if ($item->external_article_id) {
                 $secondsTimespent = $externalIdsToTimespent->get($item->external_article_id, 0);
@@ -604,5 +616,147 @@ class DashboardController extends Controller
             'articles' => $topPages,
             'totalConcurrents' => $totalConcurrents,
         ]);
+    }
+
+    /**
+     * @param \stdClass[] $topPages
+     * @param JournalInterval $journalInterval
+     * @return \stdClass[]
+     * @throws \Exception
+     */
+    private function addOverviewChartData(array $topPages, JournalInterval $journalInterval)
+    {
+        $articleIds = array_filter(Arr::pluck($topPages, 'article.external_id'));
+        //no articles present in the topPages
+        if (empty($articleIds)) {
+            return $topPages;
+        }
+
+        $currentDataSource = config('beam.pageview_graph_data_source');
+
+        switch ($currentDataSource) {
+            case 'snapshots':
+                $articlesChartData = $this->getOverviewChartDataFromSnapshots($articleIds, $journalInterval);
+                break;
+            case 'journal':
+                $articlesChartData = $this->getOverviewChartDataFromJournal($articleIds, $journalInterval);
+                break;
+            default:
+                throw new \Exception("unknown pageviews data source {$currentDataSource}");
+        }
+
+        //add chart data into topPages object
+        $topPages = array_map(function ($topPage) use ($articlesChartData) {
+            if (!isset($topPage->article) || !isset($articlesChartData[$topPage->article->external_id])) {
+                return $topPage;
+            }
+            $topPage->chartData = $articlesChartData[$topPage->article->external_id];
+
+            return $topPage;
+        }, $topPages);
+
+        return $topPages;
+    }
+
+    private function getOverviewChartDataFromSnapshots(array $articleIds, JournalInterval $journalInterval)
+    {
+        $records = $this->snapshotHelpers->concurrentArticlesHistograms($journalInterval, $articleIds);
+        $recordsByArticleId = $records->groupBy('external_article_id');
+
+        $resultsSkeleton = $this->prefillOverviewResults($journalInterval);
+        $articlesChartData = [];
+
+        // use zero-value timePoints as a base so we don't need to worry about missing snapshot values later
+        $articleSkeleton = $this->createArticleSkeleton($resultsSkeleton);
+
+        foreach ($recordsByArticleId as $articleId => $items) {
+            $timePointToMatch = reset($resultsSkeleton)['Date'];
+            $results = $articleSkeleton;
+
+            foreach ($items as $item) {
+                if ($item->timestamp < $resultsSkeleton[$timePointToMatch]['Timestamp']) {
+                    // skip all the data items earlier that the current $timePoint
+                    continue;
+                }
+
+                // move $timePoint iterator forward until it matches item's timestamp
+                do {
+                    $timePointToSet = $timePointToMatch;
+                    $timePointToMatch = next($resultsSkeleton)['Date'] ?? null;
+                } while ($timePointToMatch && $item->timestamp >= $resultsSkeleton[$timePointToMatch]['Timestamp']);
+
+                // found the $timePoint, set the snapshot value
+                $results[$timePointToSet] = [
+                    't' => $resultsSkeleton[$timePointToSet]['Timestamp'],
+                    'c' => (int) $item->count,
+                ];
+
+                if (!$timePointToMatch) {
+                    break;
+                }
+            }
+
+            $articlesChartData[$articleId] = array_values($results);
+        }
+
+        return $articlesChartData;
+    }
+
+    private function getOverviewChartDataFromJournal(array $articleIds, JournalInterval $journalInterval)
+    {
+        $journalRequest = (new AggregateRequest('pageviews', 'load'))
+            ->addFilter('article_id', ...$articleIds)
+            ->addGroup('article_id')
+            ->setTime($journalInterval->timeAfter, $journalInterval->timeBefore)
+            ->setTimeHistogram($journalInterval->intervalText);
+
+        $pageviewRecords = collect($this->journal->count($journalRequest));
+        $resultsSkeleton = $this->prefillOverviewResults($journalInterval);
+        $articleSkeleton = $this->createArticleSkeleton($resultsSkeleton);
+        $articlesChartData = [];
+
+        foreach ($pageviewRecords as $pageviewRecord) {
+            if (!isset($pageviewRecord->time_histogram)) {
+                continue;
+            }
+
+            $results = $articleSkeleton;
+            foreach ($pageviewRecord->time_histogram as $timeValue) {
+                $results[$timeValue->time]['c'] += $timeValue->value;
+            }
+            $articlesChartData[$pageviewRecord->tags->article_id] = array_values($results);
+        }
+
+        return $articlesChartData;
+    }
+
+    private function prefillOverviewResults(JournalInterval $journalInterval)
+    {
+        $timeIterator = JournalHelpers::getTimeIterator($journalInterval->timeAfter, $journalInterval->intervalMinutes);
+        $results = [];
+
+        while ($timeIterator->lessThan($journalInterval->timeBefore)) {
+            $zuluDate = $timeIterator->toIso8601ZuluString();
+            $results[$zuluDate]['Count'] = 0;
+            $results[$zuluDate]['Date'] = $zuluDate;
+            $results[$zuluDate]['Timestamp'] = $timeIterator->timestamp;
+
+            $timeIterator->addMinutes($journalInterval->intervalMinutes);
+        }
+
+        return $results;
+    }
+
+    private function createArticleSkeleton(array $resultsSkeleton)
+    {
+        $articleSkeleton = [];
+        foreach ($resultsSkeleton as $timePoint => $skeleton) {
+            $articleSkeleton[$timePoint] = [
+                't' => $skeleton['Timestamp'],
+                'c' => 0,
+            ];
+        }
+
+        return $articleSkeleton;
     }
 }

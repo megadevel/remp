@@ -5,10 +5,10 @@ namespace App\Http\Showtime;
 use App\Banner;
 use App\Campaign;
 use App\CampaignBanner;
+use App\CampaignSegment;
 use App\Contracts\SegmentAggregator;
-use App\Http\Request;
 use Carbon\Carbon;
-use Illuminate\Support\Facades\Log;
+use Illuminate\Http\Request;
 use Illuminate\Support\Collection;
 use Predis\ClientInterface;
 use Psr\Log\LoggerInterface;
@@ -37,6 +37,8 @@ class Showtime
 
     private $alignmentsMap;
 
+    private $variables;
+
     public function __construct(
         ClientInterface $redis,
         SegmentAggregator $segmentAggregator,
@@ -59,7 +61,7 @@ class Showtime
     private function getRequest()
     {
         if (!$this->request) {
-            $this->request = \App\Http\Request::createFromGlobals();
+            $this->request = Request::createFromGlobals();
         }
         return $this->request;
     }
@@ -103,6 +105,14 @@ class Showtime
         return $this->alignmentsMap;
     }
 
+    private function getVariables()
+    {
+        if (!$this->variables) {
+            $this->variables = json_decode($this->redis->get(\App\Variable::REDIS_CACHE_KEY), true) ?? [];
+        }
+        return $this->variables;
+    }
+
     public function showtime(string $userData, string $callback, ShowtimeResponse $showtimeResponse)
     {
         try {
@@ -138,6 +148,7 @@ class Showtime
         $positions = $this->getPositionMap();
         $dimensions = $this->getDimensionMap();
         $alignments = $this->getAlignmentsMap();
+        $variables = $this->getVariables();
 
         $displayData = [];
 
@@ -150,7 +161,7 @@ class Showtime
             $banner = $this->loadOneTimeBrowserBanner($browserId);
         }
         if ($banner) {
-            $displayData[] = $showtimeResponse->renderBanner($banner, $alignments, $dimensions, $positions);
+            $displayData[] = $showtimeResponse->renderBanner($banner, $alignments, $dimensions, $positions, $variables);
             return $showtimeResponse->success($callback, $displayData, [], $segmentAggregator->getProviderData());
         }
 
@@ -159,17 +170,17 @@ class Showtime
             return $showtimeResponse->success($callback, [], [], $segmentAggregator->getProviderData());
         }
 
-        $activeCampaignUuids = [];
+        $activeCampaigns = [];
         foreach ($campaignIds as $campaignId) {
             /** @var Campaign $campaign */
             $campaign = unserialize($this->redis->get(Campaign::CAMPAIGN_TAG . ":{$campaignId}"));
-            $campaignBannerVariant = $this->shouldDisplay($campaign, $data, $activeCampaignUuids);
+            $campaignBannerVariant = $this->shouldDisplay($campaign, $data, $activeCampaigns);
             if ($campaignBannerVariant) {
-                $displayData[] = $showtimeResponse->renderCampaign($campaignBannerVariant, $campaign, $alignments, $dimensions, $positions);
+                $displayData[] = $showtimeResponse->renderCampaign($campaignBannerVariant, $campaign, $alignments, $dimensions, $positions, $variables);
             }
         }
 
-        return $showtimeResponse->success($callback, $displayData, $activeCampaignUuids, $segmentAggregator->getProviderData());
+        return $showtimeResponse->success($callback, $displayData, $activeCampaigns, $segmentAggregator->getProviderData());
     }
 
 
@@ -179,13 +190,13 @@ class Showtime
      *
      * @param Campaign    $campaign
      * @param             $userData
-     * @param array       $activeCampaignUuids
+     * @param array       $activeCampaigns
      *
      * @return CampaignBanner|null
      */
-    public function shouldDisplay(Campaign $campaign, $userData, array &$activeCampaignUuids): ?CampaignBanner
+    public function shouldDisplay(Campaign $campaign, $userData, array &$activeCampaigns): ?CampaignBanner
     {
-        $userId = $userData->userId;
+        $userId = $userData->userId ?? null;
         $browserId = $userData->browserId;
         $running = false;
 
@@ -213,9 +224,21 @@ class Showtime
 
         // find variant previously displayed to user
         $seenCampaigns = $userData->campaigns ?? false;
-        if ($seenCampaigns && isset($seenCampaigns->{$campaign->uuid})) {
-            $bannerUuid = $seenCampaigns->{$campaign->uuid}->bannerId ?? null;
-            $variantUuid = $seenCampaigns->{$campaign->uuid}->variantId ?? null;
+        if ($seenCampaigns) {
+            if (isset($seenCampaigns->{$campaign->uuid})) {
+                $bannerUuid = $seenCampaigns->{$campaign->uuid}->bannerId ?? null;
+                $variantUuid = $seenCampaigns->{$campaign->uuid}->variantId ?? null;
+            }
+
+            if (isset($seenCampaigns->{$campaign->public_id}->variantId)) {
+                foreach ($campaign->campaignBanners as $campaignBanner) {
+                    if ($campaignBanner->public_id === $seenCampaigns->{$campaign->public_id}->variantId) {
+                        $bannerUuid = $campaignBanner->banner->uuid ?? null;
+                        $variantUuid = $campaignBanner->uuid ?? null;
+                        break;
+                    }
+                }
+            }
         }
 
         // fallback for older version of campaigns local storage data
@@ -280,7 +303,7 @@ class Showtime
         // using adblock?
         if ($campaign->using_adblock !== null) {
             if (!isset($userData->usingAdblock)) {
-                Log::error("Unable to load if user with ID [{$userId}] & browserId [{$browserId}] is using AdBlock.");
+                $this->logger->error("Unable to load if user with ID [{$userId}] & browserId [{$browserId}] is using AdBlock.");
                 return null;
             }
             if (($campaign->using_adblock && !$userData->usingAdblock) || ($campaign->using_adblock === false && $userData->usingAdblock)) {
@@ -377,9 +400,9 @@ class Showtime
         // Active campaign is campaign that targets selected user (previous rules were passed),
         // but whether it displays or not depends on pageview counting rules (every n-th page, up to N pageviews).
         // We need to track such campaigns on the client-side too.
-        $activeCampaignUuids[] = $campaign->uuid;
+        $activeCampaigns[] = ['uuid' => $campaign->uuid, 'public_id' => $campaign->public_id];
 
-        $seenCampaign = $seenCampaigns->{$campaign->uuid} ?? null;
+        $seenCampaign = $seenCampaigns->{$campaign->uuid} ?? $seenCampaigns->{$campaign->public_id} ?? null;
 
         // pageview rules - check display banner every n-th request
         if ($seenCampaign !== null && $campaign->pageview_rules !== null) {
@@ -396,6 +419,29 @@ class Showtime
             $displayBannerEvery = $campaign->pageview_rules['display_banner_every'] ?? 1;
             if ($displayBanner === 'every' && $pageviewCount % $displayBannerEvery !== 0) {
                 return null;
+            }
+        }
+
+        // pageview attributes - check if sent pageview attributes match conditions
+        if (!empty($campaign->pageview_attributes)) {
+            if (empty($userData->pageviewAttributes)) {
+                return null;
+            }
+
+            foreach ($campaign->pageview_attributes as $attribute) {
+                $attrName = $attribute['name'];
+                $attrValue = $attribute['value'];
+
+                if (!property_exists($userData->pageviewAttributes, $attrName)) {
+                    return null;
+                }
+                if (is_array($userData->pageviewAttributes->{$attrName})) {
+                    if (!in_array($attrValue, $userData->pageviewAttributes->{$attrName})) {
+                        return null;
+                    }
+                } elseif ($userData->pageviewAttributes->{$attrName} !== $attrValue) {
+                    return null;
+                }
             }
         }
 
@@ -470,6 +516,10 @@ class Showtime
             $campaignSegment->setRelation('campaign', $campaign); // setting this manually to avoid DB query
 
             if ($userId) {
+                if (!$this->isCacheValid($campaignSegment)) {
+                    return false;
+                }
+
                 $belongsToSegment = $this->segmentAggregator->checkUser($campaignSegment, (string)$userId);
             } else {
                 $belongsToSegment = $this->segmentAggregator->checkBrowser($campaignSegment, (string)$browserId);
@@ -486,6 +536,20 @@ class Showtime
         }
 
         return true;
+    }
+
+    private function isCacheValid(CampaignSegment $campaignSegment): bool
+    {
+        if (!$this->segmentAggregator->cacheEnabled($campaignSegment)) {
+            return true;
+        }
+
+        $cacheKeyTimeStamp = $this->redis->get(SegmentAggregator::cacheKey($campaignSegment) . '|timestamp');
+        if ($cacheKeyTimeStamp) {
+            return true;
+        }
+
+        return false;
     }
 
     private function loadOneTimeBanner(array $bannerKeys): ?Banner

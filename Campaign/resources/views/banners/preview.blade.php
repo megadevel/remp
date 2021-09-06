@@ -4,12 +4,15 @@
 var bannerUuid = null;
 @else
 var bannerUuid = '{{ $banner->uuid }}';
+var bannerPublicId = '{{ $banner->public_id }}';
 var bannerId = 'b-' + bannerUuid;
 var bannerJsonData = {!! $banner->toJson() !!};
 @endif
 
 var variantUuid = '{{ $variantUuid }}';
+var variantPublicId = '{{ $variantPublicId }}';
 var campaignUuid = '{{ $campaignUuid }}';
+var campaignPublicId = '{{ $campaignPublicId }}';
 var isControlGroup = {{ $controlGroup }};
 var scripts = [];
 if (typeof window.remplib.banner === 'undefined') {
@@ -39,8 +42,11 @@ var run = function() {
     banner.positionOptions = positions;
 
     banner.campaignUuid = campaignUuid;
+    banner.campaignPublicId = campaignPublicId;
     banner.variantUuid = variantUuid;
+    banner.variantPublicId = variantPublicId;
     banner.uuid = bannerUuid;
+    banner.publicId = bannerPublicId;
 
     if (typeof remplib.campaign.bannerUrlParams !== "undefined") {
         banner.urlParams = remplib.campaign.bannerUrlParams;
@@ -73,11 +79,11 @@ var run = function() {
     setTimeout(function() {
         if (!banner.manualEventsTracking) {
             remplib.tracker.trackEvent("banner", "show", null, null, {
-                "utm_source": "remp_campaign",
-                "utm_medium": banner.displayType,
-                "utm_campaign": banner.campaignUuid,
-                "utm_content": banner.uuid,
-                "banner_variant": banner.variantUuid
+                "rtm_source": "remp_campaign",
+                "rtm_medium": banner.displayType,
+                "rtm_campaign": banner.campaignUuid,
+                "rtm_content": banner.uuid,
+                "rtm_variant": banner.variantUuid
             });
         }
 
@@ -87,7 +93,12 @@ var run = function() {
                 banner.show = false;
             }, banner.closeTimeout);
         }
-        remplib.campaign.handleBannerDisplayed(banner.campaignUuid, banner.uuid, banner.variantUuid);
+
+        if (typeof resolve !== "undefined") {
+            resolve(true);
+        }
+
+        remplib.campaign.handleBannerDisplayed(banner.campaignUuid, banner.uuid, banner.variantUuid, banner.campaignPublicId, banner.publicId, banner.variantPublicId);
     }, banner.displayDelay);
 };
 

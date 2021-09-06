@@ -25,6 +25,7 @@ type TrackController struct {
 	PropertyStorage     model.PropertyStorage
 	EntitySchemaStorage model.EntitySchemaStorage
 	InternalHosts       []string
+	TimespentLimit      int
 }
 
 // Event represents Influx event structure
@@ -36,13 +37,14 @@ type Event struct {
 }
 
 // NewTrackController creates a track controller.
-func NewTrackController(service *goa.Service, ep sarama.AsyncProducer, ps model.PropertyStorage, ess model.EntitySchemaStorage, ih []string) *TrackController {
+func NewTrackController(service *goa.Service, ep sarama.AsyncProducer, ps model.PropertyStorage, ess model.EntitySchemaStorage, ih []string, tl int) *TrackController {
 	return &TrackController{
 		Controller:          service.NewController("TrackController"),
 		EventProducer:       ep,
 		PropertyStorage:     ps,
 		EntitySchemaStorage: ess,
 		InternalHosts:       ih,
+		TimespentLimit:      tl,
 	}
 }
 
@@ -61,6 +63,10 @@ func (c *TrackController) Commerce(ctx *app.CommerceTrackContext) error {
 	}
 	if ctx.Payload.RempCommerceID != nil {
 		tags["remp_commerce_id"] = *ctx.Payload.RempCommerceID
+	}
+
+	if ctx.Payload.CommerceSessionID != nil {
+		tags["commerce_session_id"] = *ctx.Payload.CommerceSessionID
 	}
 
 	fields := map[string]interface{}{}
@@ -131,10 +137,7 @@ func (c *TrackController) Event(ctx *app.EventTrackContext) error {
 		return ctx.NotFound()
 	}
 
-	tags := map[string]string{
-		"category": ctx.Payload.Category,
-		"action":   ctx.Payload.Action,
-	}
+	tags := map[string]string{}
 	if ctx.Payload.RempEventID != nil {
 		tags["remp_event_id"] = *ctx.Payload.RempEventID
 	} else {
@@ -156,6 +159,10 @@ func (c *TrackController) Event(ctx *app.EventTrackContext) error {
 	}
 
 	tags, fields = c.payloadToTagsFields(ctx.Payload.System, ctx.Payload.User, tags, fields)
+
+	tags["category"] = ctx.Payload.Category
+	tags["action"] = ctx.Payload.Action
+
 	if err := c.pushInternal(model.TableEvents, ctx.Payload.System.Time, tags, fields); err != nil {
 		return err
 	}
@@ -182,9 +189,7 @@ func (c *TrackController) Pageview(ctx *app.PageviewTrackContext) error {
 		return ctx.NotFound()
 	}
 
-	tags := map[string]string{
-		"category": model.CategoryPageview,
-	}
+	tags := map[string]string{}
 	fields := map[string]interface{}{}
 
 	var measurement string
@@ -197,6 +202,10 @@ func (c *TrackController) Pageview(ctx *app.PageviewTrackContext) error {
 		measurement = model.TableTimespent
 		if ctx.Payload.Timespent != nil {
 			fields["timespent"] = ctx.Payload.Timespent.Seconds
+			// limit maximum timespent; filters out broken tracking of open articles (forgotten browser window on different workspace/monitor)
+			if c.TimespentLimit > 0 && ctx.Payload.Timespent.Seconds > c.TimespentLimit {
+				fields["timespent"] = c.TimespentLimit
+			}
 			fields["unload"] = false
 			if ctx.Payload.Timespent.Unload != nil && *ctx.Payload.Timespent.Unload {
 				fields["unload"] = true
@@ -220,7 +229,6 @@ func (c *TrackController) Pageview(ctx *app.PageviewTrackContext) error {
 	}
 
 	if ctx.Payload.Article != nil {
-		fields[model.FlagArticle] = true
 		at, av := articleValues(ctx.Payload.Article)
 		for key, tag := range at {
 			tags[key] = tag
@@ -231,6 +239,8 @@ func (c *TrackController) Pageview(ctx *app.PageviewTrackContext) error {
 	} else {
 		fields[model.FlagArticle] = false
 	}
+
+	tags["category"] = model.CategoryPageview
 
 	tags, fields = c.payloadToTagsFields(ctx.Payload.System, ctx.Payload.User, tags, fields)
 	if err := c.pushInternal(measurement, ctx.Payload.System.Time, tags, fields); err != nil {
@@ -299,6 +309,14 @@ func articleValues(article *app.Article) (map[string]string, map[string]interfac
 	if article.Tags != nil {
 		values["tags"] = strings.Join(article.Tags, ",")
 	}
+
+	if article.ContentType != nil {
+		values["content_type"] = *article.ContentType
+	} else {
+		values["content_type"] = "article"
+	}
+	values[model.FlagArticle] = values["content_type"] == "article"
+
 	return tags, values
 }
 
@@ -312,6 +330,9 @@ func (c *TrackController) payloadToTagsFields(system *app.System, user *app.User
 		}
 		if user.URL != nil {
 			fields["url"] = *user.URL
+		}
+		if user.CanonicalURL != nil {
+			fields["canonical_url"] = *user.CanonicalURL
 		}
 		if user.UserAgent != nil {
 			fields["user_agent"] = *user.UserAgent
@@ -359,25 +380,47 @@ func (c *TrackController) payloadToTagsFields(system *app.System, user *app.User
 		}
 
 		if user.Source != nil {
-			if user.Source.UtmSource != nil {
-				tags["utm_source"] = *user.Source.UtmSource
+
+			// utm_ parameters parsing is deprecated and will be removed in the future
+
+			if user.Source.RtmSource != nil {
+				tags["rtm_source"] = *user.Source.RtmSource
+			} else if user.Source.UtmSource != nil { // deprecated, will be removed in the future
+				tags["rtm_source"] = *user.Source.UtmSource
 			}
-			if user.Source.UtmMedium != nil {
-				tags["utm_medium"] = *user.Source.UtmMedium
+
+			if user.Source.RtmMedium != nil {
+				tags["rtm_medium"] = *user.Source.RtmMedium
+
+				// Rewrite referer medium in case of email RTM medium
+				if *user.Source.RtmMedium == "email" {
+					tags["derived_referer_medium"] = "email"
+				}
+			} else if user.Source.UtmMedium != nil { // deprecated, will be removed in the future
+				tags["rtm_medium"] = *user.Source.UtmMedium
 
 				// Rewrite referer medium in case of email UTM
 				if *user.Source.UtmMedium == "email" {
 					tags["derived_referer_medium"] = "email"
 				}
 			}
-			if user.Source.UtmCampaign != nil {
-				tags["utm_campaign"] = *user.Source.UtmCampaign
+
+			if user.Source.RtmCampaign != nil {
+				tags["rtm_campaign"] = *user.Source.RtmCampaign
+			} else if user.Source.UtmCampaign != nil { // deprecated, will be removed in the future
+				tags["rtm_campaign"] = *user.Source.UtmCampaign
 			}
-			if user.Source.UtmContent != nil {
-				tags["utm_content"] = *user.Source.UtmContent
+
+			if user.Source.RtmContent != nil {
+				tags["rtm_content"] = *user.Source.RtmContent
+			} else if user.Source.UtmContent != nil { // deprecated, will be removed in the future
+				tags["rtm_content"] = *user.Source.UtmContent
 			}
-			if user.Source.BannerVariant != nil {
-				tags["banner_variant"] = *user.Source.BannerVariant
+
+			if user.Source.RtmVariant != nil {
+				tags["rtm_variant"] = *user.Source.RtmVariant
+			} else if user.Source.BannerVariant != nil { // deprecated, will be removed in the future
+				tags["rtm_variant"] = *user.Source.BannerVariant
 			}
 		}
 
@@ -409,6 +452,9 @@ func (c *TrackController) payloadToTagsFields(system *app.System, user *app.User
 		}
 		if user.BrowserID != nil {
 			tags["browser_id"] = *user.BrowserID
+		}
+		if user.SubscriptionIds != nil {
+			fields["subscription_ids"] = user.SubscriptionIds
 		}
 		if user.RempSessionID != nil {
 			tags["remp_session_id"] = *user.RempSessionID

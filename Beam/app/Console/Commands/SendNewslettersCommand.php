@@ -7,7 +7,7 @@ use App\Model\NewsletterCriterion;
 use App\Newsletter;
 use Carbon\Carbon;
 use DB;
-use Illuminate\Console\Command;
+use App\Console\Command;
 use Recurr\Transformer\ArrayTransformer;
 use Recurr\Transformer\ArrayTransformerConfig;
 use Recurr\Transformer\Constraint\AfterConstraint;
@@ -47,7 +47,7 @@ class SendNewslettersCommand extends Command
 
         if ($newsletters->count() === 0) {
             $this->info("No newsletters to process");
-            return;
+            return 0;
         }
 
         foreach ($newsletters as $newsletter) {
@@ -77,6 +77,9 @@ class SendNewslettersCommand extends Command
 
             $newsletter->save();
         }
+
+        $this->line(' <info>Done!</info>');
+        return 0;
     }
 
     private function retrieveNextSending($newsletter)

@@ -2,11 +2,13 @@
 
 namespace App\Model;
 
+use Illuminate\Database\Eloquent\Factories\HasFactory;
 use App\Conversion;
-use Illuminate\Database\Eloquent\Model;
 
-class ConversionCommerceEvent extends Model
+class ConversionCommerceEvent extends BaseModel
 {
+    use HasFactory;
+
     protected $casts = [
         'minutes_to_conversion' => 'integer',
         'event_prior_conversion' => 'integer',
@@ -18,10 +20,10 @@ class ConversionCommerceEvent extends Model
         'funnel_id',
         'amount',
         'currency',
-        'utm_campaign',
-        'utm_content',
-        'utm_medium',
-        'utm_source',
+        'rtm_campaign',
+        'rtm_content',
+        'rtm_medium',
+        'rtm_source',
         'conversion_id',
         'minutes_to_conversion',
         'event_prior_conversion',

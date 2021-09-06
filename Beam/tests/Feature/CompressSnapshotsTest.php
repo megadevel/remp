@@ -31,18 +31,19 @@ class CompressSnapshotsTest extends TestCase
 
     public function testCompression()
     {
-        $start = Carbon::now()->second(0);
+        $start = Carbon::now();
+        $start->setTime($start->hour, $start->minute, 0, 0);
 
          //Last 10 minutes should be kept
         for ($i = 0; $i < 10; $i++) {
-            factory(ArticleViewsSnapshot::class)->create(['time' => (clone $start)->subMinutes($i)]);
+            ArticleViewsSnapshot::factory()->create(['time' => (clone $start)->subMinutes($i)]);
         }
         $this->artisan(CompressSnapshots::COMMAND, ['--now' => $start]);
         $this->assertEquals(10, ArticleViewsSnapshot::all()->count());
 
         // Between
         for ($i = 10; $i < 30; $i++) {
-            factory(ArticleViewsSnapshot::class)->create(['time' => (clone $start)->subMinutes($i)]);
+            ArticleViewsSnapshot::factory()->create(['time' => (clone $start)->subMinutes($i)]);
         }
 
         $this->artisan(CompressSnapshots::COMMAND, ['--now' => $start]);

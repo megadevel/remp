@@ -2,6 +2,7 @@
 
 namespace App;
 
+use Illuminate\Database\Eloquent\Factories\HasFactory;
 use App\Banner;
 use App\Campaign;
 use Ramsey\Uuid\Uuid;
@@ -10,13 +11,14 @@ use Illuminate\Database\Eloquent\SoftDeletes;
 
 class CampaignBanner extends Model
 {
+    use HasFactory;
+
     use SoftDeletes;
+    use IdentificationTrait;
 
     protected $table = 'campaign_banners';
 
     public $timestamps = false;
-
-    protected $dates = ['deleted_at'];
 
     protected $fillable = [
         'id',
@@ -32,7 +34,8 @@ class CampaignBanner extends Model
         parent::boot();
 
         static::creating(function (CampaignBanner $variant) {
-            $variant->uuid = Uuid::uuid4()->toString();
+            $variant->uuid = self::generateUuid();
+            $variant->public_id = self::generatePublicId();
         });
     }
 
