@@ -64,7 +64,7 @@
                 ],
                 'avg_sum_all' => [
                     'header' => 'avg time all',
-                    'render' => ''number', //duration
+                    'render' => 'number', //duration
                     'searchable' => false,
                     'priority' => 2,
                     'className' => 'text-right',
