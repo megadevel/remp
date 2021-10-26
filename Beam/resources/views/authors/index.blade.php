@@ -85,21 +85,21 @@
                 ],
                 'avg_timespent_all' => [
                     'header' => 'avg time all',
-                    'render' => 'duration',
+                    'render' => 'number', //duration
                     'priority' => 2,
                     'searchable' => false,
                     'className' => 'text-right'
                 ],
                 'avg_timespent_signed_in' => [
                     'header' => 'avg time signed in',
-                    'render' => 'duration',
+                    'render' => 'number', //duration
                     'priority' => 5,
                     'searchable' => false,
                     'className' => 'text-right'
                 ],
                 'avg_timespent_subscribers' => [
                     'header' => 'avg time subscribers',
-                    'render' => 'duration',
+                    'render' => 'number', //duration
                     'priority' => 5,
                     'searchable' => false,
                     'className' => 'text-right'

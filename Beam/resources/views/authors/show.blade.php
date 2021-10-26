@@ -51,17 +51,17 @@
                     ],
                     'avg_timespent_all' => [
                         'header' => 'avg time all',
-                        'render' => 'duration',
+                        'render' => 'number', //duration
                         'priority' => 2,
                     ],
                     'avg_timespent_signed_in' => [
                         'header' => 'avg time signed in',
-                        'render' => 'duration',
+                        'render' => 'number', //duration
                         'priority' => 3,
                     ],
                     'avg_timespent_subscribers' => [
                         'header' => 'avg time subscribers',
-                        'render' => 'duration',
+                        'render' => 'number', //duration
                         'priority' => 3,
                     ],
                     'conversions_count' => [
